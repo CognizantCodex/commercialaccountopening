@@ -755,22 +755,8 @@ function ReviewCheckCard({ check }) {
       {checkRisk ? (
         <div className="integration-callout">
           <p>
-            checkRisk API: <strong>{checkRisk.transmissionMode}</strong>
+            checkRisk result: <strong>{checkRisk.risk ?? "Pending"}</strong>
           </p>
-          <p>
-            External assessment ID:{" "}
-            <strong>
-              {checkRisk.externalAssessmentId ?? "Pending external response"}
-            </strong>
-          </p>
-          <p>Response: <strong>{checkRisk.response}</strong></p>
-          {checkRisk.riskScore !== null ? (
-            <p>
-              Risk score: <strong>{checkRisk.riskScore}</strong>
-            </p>
-          ) : null}
-          {checkRisk.recommendation ? <p>{checkRisk.recommendation}</p> : null}
-          <p>{checkRisk.message}</p>
         </div>
       ) : null}
     </article>

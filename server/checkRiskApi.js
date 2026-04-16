@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 const DEFAULT_EXTERNAL_ENDPOINT = "https://external.example.com/check-risk";
 const EXTERNAL_APPLICATION_TIMEOUT_MS = 4_000;
 
@@ -71,7 +69,7 @@ export function createCheckRiskPayload(workspace) {
   };
 }
 
-function deriveSimulatedRiskResponse(payload) {
+function deriveSimulatedRisk(payload) {
   let score = 18;
 
   if (payload.bankingProfile.internationalActivity) {
@@ -98,45 +96,12 @@ function deriveSimulatedRiskResponse(payload) {
 
   let response = "Low";
   if (score >= 55) {
-    response = "High";
+    return "High";
   } else if (score >= 30) {
-    response = "Moderate";
+    return "Moderate";
   }
 
-  return {
-    response,
-    riskScore: score,
-    recommendation:
-      response === "High"
-        ? "Manual review is required before account opening can proceed."
-        : response === "Moderate"
-          ? "Analyst follow-up is recommended before advancing the application."
-          : "Application can move to the next review stage.",
-    message:
-      response === "High"
-        ? "checkRisk identified a high-risk profile."
-        : response === "Moderate"
-          ? "checkRisk identified a moderate-risk profile."
-          : "checkRisk identified a low-risk profile.",
-  };
-}
-
-function createSimulatedCheckRiskResponse(payload, endpoint) {
-  const payloadDigest = createHash("sha256")
-    .update(JSON.stringify(payload))
-    .digest("hex")
-    .slice(0, 12)
-    .toUpperCase();
-  const derivedRisk = deriveSimulatedRiskResponse(payload);
-
-  return {
-    ...derivedRisk,
-    provider: "simulated-check-risk",
-    endpoint,
-    externalAssessmentId: `RISK-${payloadDigest}`,
-    receivedAt: new Date().toISOString(),
-    transmissionMode: "simulated",
-  };
+  return "Low";
 }
 
 export async function submitCheckRiskApplication(workspace) {
@@ -144,10 +109,7 @@ export async function submitCheckRiskApplication(workspace) {
   const endpoint = process.env.CHECK_RISK_API_URL ?? DEFAULT_EXTERNAL_ENDPOINT;
 
   if (!hasText(process.env.CHECK_RISK_API_URL)) {
-    return {
-      request: payload,
-      response: createSimulatedCheckRiskResponse(payload, endpoint),
-    };
+    return { risk: deriveSimulatedRisk(payload) };
   }
 
   const abortController = new AbortController();
@@ -177,24 +139,10 @@ export async function submitCheckRiskApplication(workspace) {
     }
 
     return {
-      request: payload,
-      response: {
-        response: responseBody?.response ?? "Low",
-        riskScore: responseBody?.riskScore ?? null,
-        recommendation: responseBody?.recommendation ?? null,
-        message:
-          responseBody?.message ??
-          "checkRisk payload was accepted by the external application.",
-        provider: "external-check-risk",
-        endpoint,
-        externalAssessmentId:
-          responseBody?.externalAssessmentId ??
-          responseBody?.assessmentId ??
-          null,
-        receivedAt: responseBody?.receivedAt ?? new Date().toISOString(),
-        transmissionMode: "live",
-        raw: responseBody,
-      },
+      risk:
+        responseBody?.risk ??
+        responseBody?.response ??
+        "Low",
     };
   } finally {
     clearTimeout(timeoutId);

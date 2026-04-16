@@ -314,13 +314,17 @@ export const defaultWorkspace = {
         flags: [],
         score: null,
         integration: {
-          checkRisk: null,
+          checkRisk: {
+            risk: null
+          },
         },
       },
     },
     integrations: {
       checkKyc: null,
-      checkRisk: null,
+      checkRisk: {
+        risk: null
+      },
     },
   },
 };

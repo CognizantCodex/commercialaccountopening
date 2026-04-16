@@ -34,18 +34,8 @@ function mapRiskDecision(response) {
 
 export async function runRiskAgent(workspace) {
   const checkRiskTransmission = await submitCheckRiskApplication(workspace);
-  const response = checkRiskTransmission.response;
-  const decision = mapRiskDecision(response.response);
+  const decision = mapRiskDecision(checkRiskTransmission.risk);
   const flags = [];
-
-  if (response.transmissionMode === "simulated") {
-    flags.push(
-      "checkRisk API is running in simulated mode until an external endpoint is configured.",
-    );
-  }
-  if (response.recommendation) {
-    flags.push(response.recommendation);
-  }
 
   const summary =
     decision === "high"
@@ -60,18 +50,10 @@ export async function runRiskAgent(workspace) {
     decision,
     summary,
     flags,
-    score: response.riskScore,
+    score: null,
     integration: {
       checkRisk: {
-        response: response.response,
-        riskScore: response.riskScore,
-        recommendation: response.recommendation,
-        endpoint: response.endpoint,
-        provider: response.provider,
-        transmissionMode: response.transmissionMode,
-        externalAssessmentId: response.externalAssessmentId,
-        receivedAt: response.receivedAt,
-        message: response.message,
+        risk: checkRiskTransmission.risk,
       },
     },
   });
