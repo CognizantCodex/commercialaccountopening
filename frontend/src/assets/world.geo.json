@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "North America", "name": "North America" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-168, 12], [-52, 12], [-52, 72], [-168, 72], [-168, 12]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "Latin America", "name": "Latin America" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-92, -58], [-32, -58], [-32, 14], [-92, 14], [-92, -58]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "Europe", "name": "Europe" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-12, 34], [42, 34], [42, 72], [-12, 72], [-12, 34]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "Africa", "name": "Africa" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[-20, -36], [54, -36], [54, 34], [-20, 34], [-20, -36]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "Middle East", "name": "Middle East" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[32, 8], [64, 8], [64, 38], [32, 38], [32, 8]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "APAC", "name": "APAC" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[64, -12], [176, -12], [176, 72], [64, 72], [64, -12]]]
+      }
+    }
+  ]
+}

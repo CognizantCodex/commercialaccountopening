@@ -1,0 +1,269 @@
+[
+  {
+    "id": "case-aurora-001",
+    "clientId": "client-aurora",
+    "caseName": "Aurora Atlas Capital Prime Brokerage Expansion",
+    "priority": "high",
+    "stage": "intake",
+    "status": "in-flight",
+    "jurisdiction": "US / UK",
+    "region": "North America",
+    "riskScore": 64,
+    "stpEligible": false,
+    "firstTimeRight": false,
+    "onboardingHours": 34.7,
+    "assignedTo": "Ava Lewis",
+    "completeness": 62,
+    "documents": [
+      {
+        "id": "doc-incorp",
+        "type": "Certificate of Incorporation",
+        "status": "validated",
+        "completeness": 100,
+        "uploadedAt": "2026-04-16T08:00:00Z",
+        "extractedFields": ["entity-name", "registration-id", "incorporation-date"]
+      },
+      {
+        "id": "doc-ubo",
+        "type": "UBO Register",
+        "status": "pending",
+        "completeness": 48,
+        "uploadedAt": "2026-04-16T08:05:00Z",
+        "extractedFields": ["shareholder-name", "ownership", "control-rights"]
+      },
+      {
+        "id": "doc-proof",
+        "type": "Proof of Address",
+        "status": "flagged",
+        "completeness": 61,
+        "uploadedAt": "2026-04-16T08:08:00Z",
+        "extractedFields": ["address-line-1", "country", "postal-code"]
+      }
+    ],
+    "qcRules": [
+      {
+        "id": "rule-beneficial-owner",
+        "label": "Beneficial owner registry matches declared structure",
+        "status": "manual-review",
+        "rationale": "Registry extract incomplete for layer-three holding entity."
+      },
+      {
+        "id": "rule-sanctions",
+        "label": "No sanctions exposure across named controllers",
+        "status": "passed",
+        "rationale": "External screening returned no sanctioned entities."
+      },
+      {
+        "id": "rule-address",
+        "label": "Operating address corroborated across two documents",
+        "status": "failed",
+        "rationale": "Registered address differs between proof of address and tax certificate."
+      }
+    ],
+    "narrative": "High-value expansion request is waiting on AI extraction confidence and an address discrepancy before it can move into straight-through processing.",
+    "nextBestAction": "Validate the beneficial owner chain and resolve the registered address mismatch.",
+    "ownershipGraph": {
+      "nodes": [
+        { "id": "aurora", "name": "Aurora Atlas Capital", "role": "Primary client", "group": "client" },
+        { "id": "atlas-holdings", "name": "Atlas Holdings SPC", "role": "Parent entity", "group": "beneficial-owner" },
+        { "id": "nora-kim", "name": "Nora Kim", "role": "Ultimate beneficial owner", "group": "beneficial-owner" },
+        { "id": "ava-lewis", "name": "Ava Lewis", "role": "Coverage advisor", "group": "advisor" },
+        { "id": "uk-reg", "name": "UK Companies House", "role": "Registry source", "group": "jurisdiction" }
+      ],
+      "links": [
+        { "source": "aurora", "target": "atlas-holdings", "weight": 68 },
+        { "source": "atlas-holdings", "target": "nora-kim", "weight": 51 },
+        { "source": "aurora", "target": "ava-lewis", "weight": 28 },
+        { "source": "atlas-holdings", "target": "uk-reg", "weight": 14 }
+      ]
+    }
+  },
+  {
+    "id": "case-orion-002",
+    "clientId": "client-orion",
+    "caseName": "Orion Maritime Finance Swap Desk Onboarding",
+    "priority": "medium",
+    "stage": "monitoring",
+    "status": "resolved",
+    "jurisdiction": "UK / NL",
+    "region": "Europe",
+    "riskScore": 31,
+    "stpEligible": true,
+    "firstTimeRight": true,
+    "onboardingHours": 15.4,
+    "assignedTo": "Luca Perez",
+    "completeness": 98,
+    "documents": [
+      {
+        "id": "doc-orion-incorp",
+        "type": "Certificate of Good Standing",
+        "status": "validated",
+        "completeness": 100,
+        "uploadedAt": "2026-04-14T10:00:00Z",
+        "extractedFields": ["entity-name", "status", "registration-id"]
+      }
+    ],
+    "qcRules": [
+      {
+        "id": "rule-orion-sanctions",
+        "label": "Sanctions and PEP exposure",
+        "status": "passed",
+        "rationale": "No screening concerns."
+      }
+    ],
+    "narrative": "Reference case for a fully straight-through onboarding that now serves as the operational benchmark.",
+    "nextBestAction": "Maintain monitoring coverage and replicate its document pattern where possible.",
+    "ownershipGraph": {
+      "nodes": [
+        { "id": "orion", "name": "Orion Maritime Finance", "role": "Primary client", "group": "client" },
+        { "id": "helen", "name": "Helen Brooke", "role": "UBO", "group": "beneficial-owner" },
+        { "id": "luca", "name": "Luca Perez", "role": "Advisor", "group": "advisor" }
+      ],
+      "links": [
+        { "source": "orion", "target": "helen", "weight": 44 },
+        { "source": "orion", "target": "luca", "weight": 16 }
+      ]
+    }
+  },
+  {
+    "id": "case-meridian-003",
+    "clientId": "client-meridian",
+    "caseName": "Meridian Commodities Group Structured Trade Finance",
+    "priority": "high",
+    "stage": "quality-check",
+    "status": "exception",
+    "jurisdiction": "SG / HK",
+    "region": "APAC",
+    "riskScore": 72,
+    "stpEligible": false,
+    "firstTimeRight": false,
+    "onboardingHours": 41.2,
+    "assignedTo": "Sanjay Mehta",
+    "completeness": 84,
+    "documents": [
+      {
+        "id": "doc-meridian-ubo",
+        "type": "Ownership Structure",
+        "status": "validated",
+        "completeness": 94,
+        "uploadedAt": "2026-04-12T11:00:00Z",
+        "extractedFields": ["ownership", "jurisdiction", "ultimate-owner"]
+      }
+    ],
+    "qcRules": [
+      {
+        "id": "rule-meridian-source",
+        "label": "Source of wealth corroboration",
+        "status": "failed",
+        "rationale": "Source of wealth evidence expired."
+      }
+    ],
+    "narrative": "Exception-heavy case under active analyst review after source-of-wealth evidence aged out.",
+    "nextBestAction": "Refresh source-of-wealth evidence to unlock approval.",
+    "ownershipGraph": {
+      "nodes": [
+        { "id": "meridian", "name": "Meridian Commodities", "role": "Primary client", "group": "client" },
+        { "id": "trust", "name": "Harborline Trust", "role": "Beneficial owner", "group": "beneficial-owner" },
+        { "id": "sanjay", "name": "Sanjay Mehta", "role": "Advisor", "group": "advisor" }
+      ],
+      "links": [
+        { "source": "meridian", "target": "trust", "weight": 57 },
+        { "source": "meridian", "target": "sanjay", "weight": 22 }
+      ]
+    }
+  },
+  {
+    "id": "case-lattice-004",
+    "clientId": "client-lattice",
+    "caseName": "Lattice Family Office Portfolio Credit Renewal",
+    "priority": "medium",
+    "stage": "governance",
+    "status": "resolved",
+    "jurisdiction": "UAE / CH",
+    "region": "Middle East",
+    "riskScore": 39,
+    "stpEligible": true,
+    "firstTimeRight": true,
+    "onboardingHours": 18.1,
+    "assignedTo": "Elena Torres",
+    "completeness": 97,
+    "documents": [
+      {
+        "id": "doc-lattice-passport",
+        "type": "Passport",
+        "status": "validated",
+        "completeness": 100,
+        "uploadedAt": "2026-04-10T09:00:00Z",
+        "extractedFields": ["name", "nationality", "passport-number"]
+      }
+    ],
+    "qcRules": [
+      {
+        "id": "rule-lattice-override",
+        "label": "Human override documented",
+        "status": "passed",
+        "rationale": "Override approved with two reviewer sign-off."
+      }
+    ],
+    "narrative": "Governance-ready example showing how human override becomes auditable and explainable.",
+    "nextBestAction": "Use as reference pattern for explainability workflows.",
+    "ownershipGraph": {
+      "nodes": [
+        { "id": "lattice", "name": "Lattice Family Office", "role": "Client", "group": "client" },
+        { "id": "marta", "name": "Marta Hein", "role": "Beneficial owner", "group": "beneficial-owner" },
+        { "id": "elena", "name": "Elena Torres", "role": "Advisor", "group": "advisor" }
+      ],
+      "links": [
+        { "source": "lattice", "target": "marta", "weight": 61 },
+        { "source": "lattice", "target": "elena", "weight": 19 }
+      ]
+    }
+  },
+  {
+    "id": "case-polaris-005",
+    "clientId": "client-polaris",
+    "caseName": "Polaris Agro Holdings Trade Services Monitoring",
+    "priority": "high",
+    "stage": "monitoring",
+    "status": "monitored",
+    "jurisdiction": "BR / US",
+    "region": "Latin America",
+    "riskScore": 67,
+    "stpEligible": false,
+    "firstTimeRight": true,
+    "onboardingHours": 22.5,
+    "assignedTo": "Mina Rocha",
+    "completeness": 95,
+    "documents": [
+      {
+        "id": "doc-polaris-tax",
+        "type": "Tax Certificate",
+        "status": "validated",
+        "completeness": 100,
+        "uploadedAt": "2026-04-11T15:00:00Z",
+        "extractedFields": ["tax-id", "country", "effective-date"]
+      }
+    ],
+    "qcRules": [
+      {
+        "id": "rule-polaris-alert",
+        "label": "Continuous monitoring watchlist delta",
+        "status": "manual-review",
+        "rationale": "Material watchlist change requires analyst confirmation."
+      }
+    ],
+    "narrative": "Existing monitored client used to show how the platform handles always-on risk without reopening the entire onboarding workflow.",
+    "nextBestAction": "Investigate the latest monitoring pulse and confirm whether escalation is required.",
+    "ownershipGraph": {
+      "nodes": [
+        { "id": "polaris", "name": "Polaris Agro Holdings", "role": "Client", "group": "client" },
+        { "id": "mina", "name": "Mina Rocha", "role": "Advisor", "group": "advisor" },
+        { "id": "registry", "name": "Brazil Corporate Registry", "role": "Registry", "group": "jurisdiction" }
+      ],
+      "links": [
+        { "source": "polaris", "target": "mina", "weight": 21 },
+        { "source": "polaris", "target": "registry", "weight": 13 }
+      ]
+    }
+  }
+]
