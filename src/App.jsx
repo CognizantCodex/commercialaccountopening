@@ -2,6 +2,16 @@ import { startTransition, useEffect, useRef, useState } from "react";
 import { loadWorkspace, saveWorkspace } from "./api";
 import { defaultWorkspace } from "./defaultWorkspace";
 
+const PHONE_DIGIT_LIMIT = 10;
+const POSTAL_CODE_DIGIT_LIMIT = 5;
+const EXTENSION_DIGIT_LIMIT = 6;
+const EIN_DIGIT_LIMIT = 9;
+const MONEY_DIGIT_LIMIT = 12;
+const COUNT_DIGIT_LIMIT = 6;
+const OWNERSHIP_PERCENT_DECIMAL_LIMIT = 2;
+const OWNERSHIP_PERCENT_WHOLE_LIMIT = 3;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function createOwner(id = `owner-${Date.now()}`) {
   return {
     id,
@@ -14,29 +24,151 @@ function createOwner(id = `owner-${Date.now()}`) {
   };
 }
 
+function sanitizeDigits(value, maxLength) {
+  return String(value ?? "")
+    .replace(/\D/g, "")
+    .slice(0, maxLength);
+}
+
+function sanitizePhoneNumber(value) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+
+  if (digits.length === PHONE_DIGIT_LIMIT + 1 && digits.startsWith("1")) {
+    return digits.slice(1, PHONE_DIGIT_LIMIT + 1);
+  }
+
+  return digits.slice(0, PHONE_DIGIT_LIMIT);
+}
+
+function sanitizePostalCode(value) {
+  return sanitizeDigits(value, POSTAL_CODE_DIGIT_LIMIT);
+}
+
+function sanitizeExtension(value) {
+  return sanitizeDigits(value, EXTENSION_DIGIT_LIMIT);
+}
+
+function sanitizeEin(value) {
+  const digits = sanitizeDigits(value, EIN_DIGIT_LIMIT);
+
+  if (digits.length <= 2) {
+    return digits;
+  }
+
+  return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+}
+
+function sanitizeWholeNumber(value, maxLength = COUNT_DIGIT_LIMIT) {
+  return sanitizeDigits(value, maxLength);
+}
+
+function sanitizeCurrencyAmount(value) {
+  return sanitizeWholeNumber(value, MONEY_DIGIT_LIMIT);
+}
+
+function sanitizePercentage(value) {
+  const normalizedValue = String(value ?? "").replace(/[^\d.]/g, "");
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  const [wholePart = "", ...decimalParts] = normalizedValue.split(".");
+  const limitedWholePart = wholePart.slice(0, OWNERSHIP_PERCENT_WHOLE_LIMIT);
+  const limitedDecimalPart = decimalParts
+    .join("")
+    .slice(0, OWNERSHIP_PERCENT_DECIMAL_LIMIT);
+
+  if (!limitedWholePart && !limitedDecimalPart) {
+    return "";
+  }
+
+  const numericWholePart = Number.parseInt(limitedWholePart || "0", 10);
+  if (numericWholePart > 100) {
+    return "100";
+  }
+
+  if (numericWholePart === 100) {
+    return "100";
+  }
+
+  if (!decimalParts.length) {
+    return limitedWholePart;
+  }
+
+  return `${limitedWholePart || "0"}.${limitedDecimalPart}`;
+}
+
+function isValidWebsite(value) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  const candidateUrl = /^https?:\/\//i.test(normalizedValue)
+    ? normalizedValue
+    : `https://${normalizedValue}`;
+
+  try {
+    const url = new URL(candidateUrl);
+    return ["http:", "https:"].includes(url.protocol) && url.hostname.includes(".");
+  } catch {
+    return false;
+  }
+}
+
 function mergeWorkspace(candidate = {}) {
+  const companyInfo = {
+    ...defaultWorkspace.companyInfo,
+    ...(candidate.companyInfo ?? {}),
+  };
+  const primaryContact = {
+    ...defaultWorkspace.primaryContact,
+    ...(candidate.primaryContact ?? {}),
+  };
+  const addresses = {
+    ...defaultWorkspace.addresses,
+    ...(candidate.addresses ?? {}),
+  };
+  const bankingProfile = {
+    ...defaultWorkspace.bankingProfile,
+    ...(candidate.bankingProfile ?? {}),
+    requestedProducts:
+      candidate.bankingProfile?.requestedProducts?.length
+        ? candidate.bankingProfile.requestedProducts
+        : defaultWorkspace.bankingProfile.requestedProducts,
+  };
+
   return {
     ...defaultWorkspace,
     ...candidate,
     companyInfo: {
-      ...defaultWorkspace.companyInfo,
-      ...(candidate.companyInfo ?? {}),
+      ...companyInfo,
+      taxId: sanitizeEin(companyInfo.taxId),
+      annualRevenue: sanitizeCurrencyAmount(companyInfo.annualRevenue),
+      employeeCount: sanitizeWholeNumber(companyInfo.employeeCount),
+      website: String(companyInfo.website ?? "").trim(),
     },
     primaryContact: {
-      ...defaultWorkspace.primaryContact,
-      ...(candidate.primaryContact ?? {}),
+      ...primaryContact,
+      phone: sanitizePhoneNumber(primaryContact.phone),
+      extension: sanitizeExtension(primaryContact.extension),
+      email: String(primaryContact.email ?? "").trim(),
     },
     addresses: {
-      ...defaultWorkspace.addresses,
-      ...(candidate.addresses ?? {}),
+      ...addresses,
+      postalCode: sanitizePostalCode(addresses.postalCode),
+      operatingPostalCode: sanitizePostalCode(addresses.operatingPostalCode),
     },
     bankingProfile: {
-      ...defaultWorkspace.bankingProfile,
-      ...(candidate.bankingProfile ?? {}),
-      requestedProducts:
-        candidate.bankingProfile?.requestedProducts?.length
-          ? candidate.bankingProfile.requestedProducts
-          : defaultWorkspace.bankingProfile.requestedProducts,
+      ...bankingProfile,
+      expectedOpeningDeposit: sanitizeCurrencyAmount(
+        bankingProfile.expectedOpeningDeposit,
+      ),
+      monthlyIncoming: sanitizeCurrencyAmount(bankingProfile.monthlyIncoming),
+      monthlyOutgoing: sanitizeCurrencyAmount(bankingProfile.monthlyOutgoing),
+      onlineBankingUsers: sanitizeWholeNumber(bankingProfile.onlineBankingUsers),
     },
     documents: {
       ...defaultWorkspace.documents,
@@ -59,6 +191,10 @@ function mergeWorkspace(candidate = {}) {
       candidate.countryOptions?.length
         ? candidate.countryOptions
         : defaultWorkspace.countryOptions,
+    stateOptions:
+      candidate.stateOptions?.length
+        ? candidate.stateOptions
+        : defaultWorkspace.stateOptions,
     productOptions:
       candidate.productOptions?.length
         ? candidate.productOptions
@@ -76,6 +212,9 @@ function mergeWorkspace(candidate = {}) {
         ? candidate.beneficialOwners.map((owner, index) => ({
             ...createOwner(owner.id ?? `owner-${index + 1}`),
             ...owner,
+            email: String(owner.email ?? "").trim(),
+            phone: sanitizePhoneNumber(owner.phone),
+            ownershipPercentage: sanitizePercentage(owner.ownershipPercentage),
           }))
         : defaultWorkspace.beneficialOwners,
   };
@@ -111,6 +250,386 @@ function formatTimestamp(timestamp) {
   }).format(date);
 }
 
+function getRequiredError(label, value) {
+  return isFilled(value) ? "" : `${label} is required.`;
+}
+
+function getEmailError(label, value, required = false) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  return EMAIL_PATTERN.test(normalizedValue)
+    ? ""
+    : `Enter a valid ${label.toLowerCase()}.`;
+}
+
+function getPhoneError(label, value, required = false) {
+  const normalizedValue = sanitizePhoneNumber(value);
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  return normalizedValue.length === PHONE_DIGIT_LIMIT
+    ? ""
+    : `${label} must be 10 digits.`;
+}
+
+function getPostalCodeError(label, value, required = false) {
+  const normalizedValue = sanitizePostalCode(value);
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  return normalizedValue.length === POSTAL_CODE_DIGIT_LIMIT
+    ? ""
+    : `${label} must be 5 digits.`;
+}
+
+function getEinError(label, value, required = false) {
+  const normalizedValue = sanitizeDigits(value, EIN_DIGIT_LIMIT);
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  return normalizedValue.length === EIN_DIGIT_LIMIT
+    ? ""
+    : `${label} must be 9 digits.`;
+}
+
+function getWebsiteError(label, value) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  return isValidWebsite(normalizedValue)
+    ? ""
+    : `Enter a valid ${label.toLowerCase()}.`;
+}
+
+function getWholeNumberError(label, value, required = false) {
+  const normalizedValue = sanitizeWholeNumber(value);
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  return Number.parseInt(normalizedValue, 10) > 0
+    ? ""
+    : `${label} must be greater than 0.`;
+}
+
+function getCurrencyError(label, value, required = false) {
+  const normalizedValue = sanitizeCurrencyAmount(value);
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  return Number.parseInt(normalizedValue, 10) > 0
+    ? ""
+    : `${label} must be greater than 0.`;
+}
+
+function getPercentageError(label, value, required = false) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return required ? `${label} is required.` : "";
+  }
+
+  const numericValue = Number.parseFloat(normalizedValue);
+  if (Number.isNaN(numericValue)) {
+    return `Enter a valid ${label.toLowerCase()}.`;
+  }
+
+  return numericValue > 0 && numericValue <= 100
+    ? ""
+    : `${label} must be between 0 and 100.`;
+}
+
+function buildValidationErrors(workspace) {
+  const errors = {};
+
+  const companyRequiredFields = [
+    ["companyInfo.legalName", "Legal entity name", workspace.companyInfo.legalName],
+    [
+      "companyInfo.registrationNumber",
+      "Registration number",
+      workspace.companyInfo.registrationNumber,
+    ],
+    [
+      "companyInfo.incorporationDate",
+      "Date of incorporation",
+      workspace.companyInfo.incorporationDate,
+    ],
+    [
+      "companyInfo.incorporationState",
+      "State of registration",
+      workspace.companyInfo.incorporationState,
+    ],
+    ["companyInfo.industry", "Primary industry", workspace.companyInfo.industry],
+  ];
+
+  companyRequiredFields.forEach(([key, label, value]) => {
+    const error = getRequiredError(label, value);
+    if (error) {
+      errors[key] = error;
+    }
+  });
+
+  const companyFormatErrors = [
+    [
+      "companyInfo.taxId",
+      getEinError("Federal tax ID / EIN", workspace.companyInfo.taxId, true),
+    ],
+    [
+      "companyInfo.website",
+      getWebsiteError("Website", workspace.companyInfo.website),
+    ],
+    [
+      "companyInfo.annualRevenue",
+      getCurrencyError("Annual revenue", workspace.companyInfo.annualRevenue),
+    ],
+    [
+      "companyInfo.employeeCount",
+      getWholeNumberError("Employee count", workspace.companyInfo.employeeCount),
+    ],
+  ];
+
+  companyFormatErrors.forEach(([key, error]) => {
+    if (error) {
+      errors[key] = error;
+    }
+  });
+
+  const primaryContactErrors = [
+    ["primaryContact.fullName", getRequiredError("Full name", workspace.primaryContact.fullName)],
+    [
+      "primaryContact.email",
+      getEmailError("Primary contact email", workspace.primaryContact.email, true),
+    ],
+    [
+      "primaryContact.phone",
+      getPhoneError("Primary contact phone", workspace.primaryContact.phone, true),
+    ],
+    [
+      "primaryContact.extension",
+      getWholeNumberError("Extension", workspace.primaryContact.extension),
+    ],
+  ];
+
+  primaryContactErrors.forEach(([key, error]) => {
+    if (error) {
+      errors[key] = error;
+    }
+  });
+
+  const registeredAddressErrors = [
+    ["addresses.registeredLine1", getRequiredError("Registered address line 1", workspace.addresses.registeredLine1)],
+    ["addresses.city", getRequiredError("Registered city", workspace.addresses.city)],
+    ["addresses.state", getRequiredError("Registered state", workspace.addresses.state)],
+    [
+      "addresses.postalCode",
+      getPostalCodeError("Registered ZIP code", workspace.addresses.postalCode, true),
+    ],
+  ];
+
+  registeredAddressErrors.forEach(([key, error]) => {
+    if (error) {
+      errors[key] = error;
+    }
+  });
+
+  if (!workspace.addresses.operatingSameAsRegistered) {
+    const operatingAddressErrors = [
+      [
+        "addresses.operatingLine1",
+        getRequiredError("Operating address line 1", workspace.addresses.operatingLine1),
+      ],
+      [
+        "addresses.operatingCity",
+        getRequiredError("Operating city", workspace.addresses.operatingCity),
+      ],
+      [
+        "addresses.operatingState",
+        getRequiredError("Operating state", workspace.addresses.operatingState),
+      ],
+      [
+        "addresses.operatingPostalCode",
+        getPostalCodeError(
+          "Operating ZIP code",
+          workspace.addresses.operatingPostalCode,
+          true,
+        ),
+      ],
+    ];
+
+    operatingAddressErrors.forEach(([key, error]) => {
+      if (error) {
+        errors[key] = error;
+      }
+    });
+  }
+
+  const bankingErrors = [
+    [
+      "bankingProfile.accountPurpose",
+      getRequiredError(
+        "Primary purpose of the account",
+        workspace.bankingProfile.accountPurpose,
+      ),
+    ],
+    [
+      "bankingProfile.expectedOpeningDeposit",
+      getCurrencyError(
+        "Expected opening deposit",
+        workspace.bankingProfile.expectedOpeningDeposit,
+        true,
+      ),
+    ],
+    [
+      "bankingProfile.monthlyIncoming",
+      getCurrencyError(
+        "Estimated monthly incoming volume",
+        workspace.bankingProfile.monthlyIncoming,
+        true,
+      ),
+    ],
+    [
+      "bankingProfile.monthlyOutgoing",
+      getCurrencyError(
+        "Estimated monthly outgoing volume",
+        workspace.bankingProfile.monthlyOutgoing,
+        true,
+      ),
+    ],
+    [
+      "bankingProfile.onlineBankingUsers",
+      getWholeNumberError(
+        "Number of online banking users",
+        workspace.bankingProfile.onlineBankingUsers,
+      ),
+    ],
+  ];
+
+  bankingErrors.forEach(([key, error]) => {
+    if (error) {
+      errors[key] = error;
+    }
+  });
+
+  if (!workspace.bankingProfile.requestedProducts.length) {
+    errors["bankingProfile.requestedProducts"] =
+      "Select at least one account or treasury product.";
+  }
+
+  workspace.beneficialOwners.forEach((owner, index) => {
+    const ownerPrefix = `beneficialOwners.${owner.id}`;
+    const ownerLabel = `Owner ${index + 1}`;
+    const ownerErrors = [
+      [`${ownerPrefix}.fullName`, getRequiredError(`${ownerLabel} full name`, owner.fullName)],
+      [`${ownerPrefix}.title`, getRequiredError(`${ownerLabel} title`, owner.title)],
+      [
+        `${ownerPrefix}.ownershipPercentage`,
+        getPercentageError(
+          `${ownerLabel} ownership percentage`,
+          owner.ownershipPercentage,
+          true,
+        ),
+      ],
+      [`${ownerPrefix}.email`, getEmailError(`${ownerLabel} email`, owner.email)],
+      [`${ownerPrefix}.phone`, getPhoneError(`${ownerLabel} phone`, owner.phone)],
+    ];
+
+    ownerErrors.forEach(([key, error]) => {
+      if (error) {
+        errors[key] = error;
+      }
+    });
+  });
+
+  workspace.declarationOptions.forEach((declaration) => {
+    if (declaration.required && !workspace.declarations[declaration.key]) {
+      errors[`declarations.${declaration.key}`] = declaration.title;
+    }
+  });
+
+  return errors;
+}
+
+function getStepFieldKeys(stepId, workspace) {
+  switch (stepId) {
+    case "company":
+      return [
+        "companyInfo.legalName",
+        "companyInfo.registrationNumber",
+        "companyInfo.taxId",
+        "companyInfo.incorporationDate",
+        "companyInfo.incorporationState",
+        "companyInfo.industry",
+        "companyInfo.website",
+        "companyInfo.annualRevenue",
+        "companyInfo.employeeCount",
+      ];
+    case "contact":
+      return [
+        "primaryContact.fullName",
+        "primaryContact.email",
+        "primaryContact.phone",
+        "primaryContact.extension",
+        "addresses.registeredLine1",
+        "addresses.city",
+        "addresses.state",
+        "addresses.postalCode",
+        ...(workspace.addresses.operatingSameAsRegistered
+          ? []
+          : [
+              "addresses.operatingLine1",
+              "addresses.operatingCity",
+              "addresses.operatingState",
+              "addresses.operatingPostalCode",
+            ]),
+      ];
+    case "banking":
+      return [
+        "bankingProfile.accountPurpose",
+        "bankingProfile.requestedProducts",
+        "bankingProfile.expectedOpeningDeposit",
+        "bankingProfile.monthlyIncoming",
+        "bankingProfile.monthlyOutgoing",
+        "bankingProfile.onlineBankingUsers",
+      ];
+    case "ownership":
+      return workspace.beneficialOwners.flatMap((owner) => [
+        `beneficialOwners.${owner.id}.fullName`,
+        `beneficialOwners.${owner.id}.title`,
+        `beneficialOwners.${owner.id}.ownershipPercentage`,
+        `beneficialOwners.${owner.id}.email`,
+        `beneficialOwners.${owner.id}.phone`,
+      ]);
+    case "documents":
+      return workspace.declarationOptions
+        .filter((declaration) => declaration.required)
+        .map((declaration) => `declarations.${declaration.key}`);
+    default:
+      return [];
+  }
+}
+
+function getFieldValue(workspace, fieldKey) {
+  return fieldKey
+    .split(".")
+    .reduce((currentValue, key) => currentValue?.[key], workspace);
+}
+
 function StepButton({ step, active, meta, onClick }) {
   return (
     <button
@@ -144,9 +663,14 @@ function TextField({
   placeholder,
   type = "text",
   required = false,
+  onBlur,
+  error = "",
+  inputMode,
+  maxLength,
+  autoComplete,
 }) {
   return (
-    <label className="field">
+    <label className={`field${error ? " has-error" : ""}`}>
       <span>
         {label}
         {required ? <small>Required</small> : null}
@@ -155,38 +679,78 @@ function TextField({
         type={type}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         placeholder={placeholder}
+        required={required}
+        aria-invalid={Boolean(error)}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        autoComplete={autoComplete}
       />
+      {error ? <small className="field-error-copy">{error}</small> : null}
     </label>
   );
 }
 
-function SelectField({ label, value, onChange, options, required = false }) {
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  required = false,
+  onBlur,
+  error = "",
+  placeholder,
+}) {
   return (
-    <label className="field">
+    <label className={`field${error ? " has-error" : ""}`}>
       <span>
         {label}
         {required ? <small>Required</small> : null}
       </span>
-      <select value={value} onChange={onChange}>
+      <select
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        required={required}
+        aria-invalid={Boolean(error)}
+      >
+        {placeholder ? <option value="">{placeholder}</option> : null}
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
         ))}
       </select>
+      {error ? <small className="field-error-copy">{error}</small> : null}
     </label>
   );
 }
 
-function TextAreaField({ label, value, onChange, placeholder, required = false }) {
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  onBlur,
+  error = "",
+}) {
   return (
-    <label className="field field-textarea">
+    <label className={`field field-textarea${error ? " has-error" : ""}`}>
       <span>
         {label}
         {required ? <small>Required</small> : null}
       </span>
-      <textarea value={value} onChange={onChange} placeholder={placeholder} />
+      <textarea
+        value={value}
+        onChange={onChange}
+        onBlur={onBlur}
+        placeholder={placeholder}
+        required={required}
+        aria-invalid={Boolean(error)}
+      />
+      {error ? <small className="field-error-copy">{error}</small> : null}
     </label>
   );
 }
@@ -204,7 +768,18 @@ function OptionCard({ title, detail, checked, onChange }) {
   );
 }
 
-function OwnerCard({ owner, index, onFieldChange, onToggleSigner, onRemove, canRemove }) {
+function OwnerCard({
+  owner,
+  index,
+  onFieldChange,
+  onToggleSigner,
+  onRemove,
+  canRemove,
+  onFieldBlur,
+  getFieldError,
+}) {
+  const ownerFieldPrefix = `beneficialOwners.${owner.id}`;
+
   return (
     <article className="owner-card">
       <div className="owner-card-header">
@@ -224,13 +799,18 @@ function OwnerCard({ owner, index, onFieldChange, onToggleSigner, onRemove, canR
           label="Full name"
           value={owner.fullName}
           onChange={(event) => onFieldChange("fullName", event.target.value)}
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.fullName`)}
+          error={getFieldError(`${ownerFieldPrefix}.fullName`)}
           placeholder="Full legal name"
+          autoComplete="name"
           required
         />
         <TextField
           label="Title"
           value={owner.title}
           onChange={(event) => onFieldChange("title", event.target.value)}
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.title`)}
+          error={getFieldError(`${ownerFieldPrefix}.title`)}
           placeholder="Role or title"
           required
         />
@@ -238,9 +818,15 @@ function OwnerCard({ owner, index, onFieldChange, onToggleSigner, onRemove, canR
           label="Ownership %"
           value={owner.ownershipPercentage}
           onChange={(event) =>
-            onFieldChange("ownershipPercentage", event.target.value)
+            onFieldChange(
+              "ownershipPercentage",
+              sanitizePercentage(event.target.value),
+            )
           }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.ownershipPercentage`)}
+          error={getFieldError(`${ownerFieldPrefix}.ownershipPercentage`)}
           placeholder="25"
+          inputMode="decimal"
           required
         />
         <TextField
@@ -248,13 +834,23 @@ function OwnerCard({ owner, index, onFieldChange, onToggleSigner, onRemove, canR
           type="email"
           value={owner.email}
           onChange={(event) => onFieldChange("email", event.target.value)}
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.email`)}
+          error={getFieldError(`${ownerFieldPrefix}.email`)}
           placeholder="name@company.com"
+          autoComplete="email"
         />
         <TextField
           label="Phone"
           value={owner.phone}
-          onChange={(event) => onFieldChange("phone", event.target.value)}
-          placeholder="+1 (000) 000-0000"
+          onChange={(event) =>
+            onFieldChange("phone", sanitizePhoneNumber(event.target.value))
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.phone`)}
+          error={getFieldError(`${ownerFieldPrefix}.phone`)}
+          placeholder="4155550123"
+          inputMode="numeric"
+          maxLength={PHONE_DIGIT_LIMIT}
+          autoComplete="tel"
         />
       </div>
 
@@ -276,6 +872,7 @@ function App() {
   const [saveState, setSaveState] = useState("idle");
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [touchedFields, setTouchedFields] = useState({});
   const [statusMessage, setStatusMessage] = useState(
     "Connecting to the secure application workspace...",
   );
@@ -316,20 +913,6 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!hasBootstrapped || !hasUnsavedChanges || saveState !== "idle") {
-      return undefined;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void persistWorkspace("auto");
-    }, 900);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [workspace, hasBootstrapped, hasUnsavedChanges, saveState]);
-
   const currentStep =
     workspace.steps.find((step) => step.id === workspace.activeStep) ??
     workspace.steps[0];
@@ -341,45 +924,114 @@ function App() {
     workspace.steps[workspace.steps.length - 1];
   const previousStep =
     workspace.steps[Math.max(currentStepIndex - 1, 0)] ?? workspace.steps[0];
+  const validationErrors = buildValidationErrors(workspace);
+  const currentStepFieldKeys = getStepFieldKeys(workspace.activeStep, workspace);
+  const currentStepValidationMessages = [
+    ...new Set(
+      currentStepFieldKeys
+        .map((fieldKey) => (touchedFields[fieldKey] ? validationErrors[fieldKey] : ""))
+        .filter(Boolean),
+    ),
+  ];
+
+  useEffect(() => {
+    if (
+      !hasBootstrapped ||
+      !hasUnsavedChanges ||
+      saveState !== "idle" ||
+      currentStepFieldKeys.some((fieldKey) => {
+        const fieldValue = getFieldValue(workspace, fieldKey);
+        return isFilled(fieldValue) && Boolean(validationErrors[fieldKey]);
+      })
+    ) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void persistWorkspace("auto");
+    }, 900);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    workspace,
+    hasBootstrapped,
+    hasUnsavedChanges,
+    saveState,
+    currentStepFieldKeys,
+    validationErrors,
+  ]);
+
+  function isCompletedField(fieldKey, value) {
+    return isFilled(value) && !validationErrors[fieldKey];
+  }
 
   const sectionCompletion = {
     company: {
       complete: [
-        workspace.companyInfo.legalName,
-        workspace.companyInfo.registrationNumber,
-        workspace.companyInfo.taxId,
-        workspace.companyInfo.incorporationDate,
-        workspace.companyInfo.incorporationState,
-        workspace.companyInfo.industry,
-      ].filter(isFilled).length,
+        isCompletedField("companyInfo.legalName", workspace.companyInfo.legalName),
+        isCompletedField(
+          "companyInfo.registrationNumber",
+          workspace.companyInfo.registrationNumber,
+        ),
+        isCompletedField("companyInfo.taxId", workspace.companyInfo.taxId),
+        isCompletedField(
+          "companyInfo.incorporationDate",
+          workspace.companyInfo.incorporationDate,
+        ),
+        isCompletedField(
+          "companyInfo.incorporationState",
+          workspace.companyInfo.incorporationState,
+        ),
+        isCompletedField("companyInfo.industry", workspace.companyInfo.industry),
+      ].filter(Boolean).length,
       total: 6,
     },
     contact: {
       complete: [
-        workspace.primaryContact.fullName,
-        workspace.primaryContact.email,
-        workspace.primaryContact.phone,
-        workspace.addresses.registeredLine1,
-        workspace.addresses.city,
-        workspace.addresses.state,
-        workspace.addresses.postalCode,
-      ].filter(isFilled).length,
+        isCompletedField("primaryContact.fullName", workspace.primaryContact.fullName),
+        isCompletedField("primaryContact.email", workspace.primaryContact.email),
+        isCompletedField("primaryContact.phone", workspace.primaryContact.phone),
+        isCompletedField("addresses.registeredLine1", workspace.addresses.registeredLine1),
+        isCompletedField("addresses.city", workspace.addresses.city),
+        isCompletedField("addresses.state", workspace.addresses.state),
+        isCompletedField("addresses.postalCode", workspace.addresses.postalCode),
+      ].filter(Boolean).length,
       total: 7,
     },
     banking: {
       complete: [
-        workspace.bankingProfile.accountPurpose,
-        workspace.bankingProfile.requestedProducts.length > 0,
-        workspace.bankingProfile.expectedOpeningDeposit,
-        workspace.bankingProfile.monthlyIncoming,
-        workspace.bankingProfile.monthlyOutgoing,
-      ].filter(isFilled).length,
+        isCompletedField(
+          "bankingProfile.accountPurpose",
+          workspace.bankingProfile.accountPurpose,
+        ),
+        !validationErrors["bankingProfile.requestedProducts"],
+        isCompletedField(
+          "bankingProfile.expectedOpeningDeposit",
+          workspace.bankingProfile.expectedOpeningDeposit,
+        ),
+        isCompletedField(
+          "bankingProfile.monthlyIncoming",
+          workspace.bankingProfile.monthlyIncoming,
+        ),
+        isCompletedField(
+          "bankingProfile.monthlyOutgoing",
+          workspace.bankingProfile.monthlyOutgoing,
+        ),
+      ].filter(Boolean).length,
       total: 5,
     },
     ownership: {
       complete: [
         workspace.beneficialOwners.some(
-          (owner) => isFilled(owner.fullName) && isFilled(owner.ownershipPercentage),
+          (owner) =>
+            isFilled(owner.fullName) &&
+            isFilled(owner.title) &&
+            isFilled(owner.ownershipPercentage) &&
+            !validationErrors[`beneficialOwners.${owner.id}.fullName`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.title`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.ownershipPercentage`],
         ),
         workspace.beneficialOwners.some((owner) => owner.isAuthorizedSigner),
       ].filter(Boolean).length,
@@ -411,24 +1063,39 @@ function App() {
   const completionPercentage = Math.round((completedChecks / totalChecks) * 100);
 
   const missingItems = [];
-  if (!isFilled(workspace.companyInfo.legalName)) {
+  if (validationErrors["companyInfo.legalName"]) {
     missingItems.push("Enter the full legal entity name.");
   }
-  if (!isFilled(workspace.companyInfo.taxId)) {
+  if (validationErrors["companyInfo.taxId"]) {
     missingItems.push("Provide the federal tax ID / EIN.");
   }
-  if (!isFilled(workspace.primaryContact.email)) {
-    missingItems.push("Add the primary contact email address.");
+  if (validationErrors["companyInfo.incorporationState"]) {
+    missingItems.push("Select the state of registration.");
   }
-  if (!isFilled(workspace.addresses.registeredLine1)) {
+  if (validationErrors["primaryContact.email"]) {
+    missingItems.push(validationErrors["primaryContact.email"]);
+  }
+  if (validationErrors["primaryContact.phone"]) {
+    missingItems.push(validationErrors["primaryContact.phone"]);
+  }
+  if (validationErrors["addresses.registeredLine1"]) {
     missingItems.push("Complete the registered business address.");
   }
-  if (!isFilled(workspace.bankingProfile.accountPurpose)) {
+  if (validationErrors["addresses.postalCode"]) {
+    missingItems.push(validationErrors["addresses.postalCode"]);
+  }
+  if (validationErrors["bankingProfile.accountPurpose"]) {
     missingItems.push("Describe the intended use of the account.");
+  }
+  if (validationErrors["bankingProfile.requestedProducts"]) {
+    missingItems.push(validationErrors["bankingProfile.requestedProducts"]);
   }
   if (
     !workspace.beneficialOwners.some(
-      (owner) => isFilled(owner.fullName) && isFilled(owner.ownershipPercentage),
+      (owner) =>
+        isFilled(owner.fullName) &&
+        isFilled(owner.title) &&
+        isFilled(owner.ownershipPercentage),
     )
   ) {
     missingItems.push("Add at least one beneficial owner or control person.");
@@ -436,6 +1103,8 @@ function App() {
   if (!workspace.declarations.confirmTerms) {
     missingItems.push("Review and accept the final declarations.");
   }
+
+  const uniqueMissingItems = [...new Set(missingItems)];
 
   const lastSyncedLabel = formatTimestamp(workspace.lastUpdatedAt);
   const backendLabel =
@@ -455,6 +1124,30 @@ function App() {
     saveVersionRef.current += 1;
     setHasUnsavedChanges(true);
     setSaveState("idle");
+  }
+
+  function markFieldsTouched(fieldKeys) {
+    if (!fieldKeys.length) {
+      return;
+    }
+
+    setTouchedFields((current) => {
+      const nextTouchedFields = { ...current };
+
+      fieldKeys.forEach((fieldKey) => {
+        nextTouchedFields[fieldKey] = true;
+      });
+
+      return nextTouchedFields;
+    });
+  }
+
+  function handleFieldBlur(fieldKey) {
+    markFieldsTouched([fieldKey]);
+  }
+
+  function getFieldError(fieldKey) {
+    return touchedFields[fieldKey] ? validationErrors[fieldKey] ?? "" : "";
   }
 
   async function persistWorkspace(mode = "manual") {
@@ -594,7 +1287,37 @@ function App() {
   }
 
   async function handleSave() {
+    markFieldsTouched(currentStepFieldKeys);
+
+    if (currentStepFieldKeys.some((fieldKey) => validationErrors[fieldKey])) {
+      setStatusMessage("Please fix the highlighted fields before saving this section.");
+      return;
+    }
+
     await persistWorkspace("manual");
+  }
+
+  function handleContinue() {
+    const blockingErrors = currentStepFieldKeys.filter(
+      (fieldKey) => validationErrors[fieldKey],
+    );
+
+    if (blockingErrors.length) {
+      markFieldsTouched(currentStepFieldKeys);
+      setStatusMessage(
+        "Please complete the highlighted required fields before continuing.",
+      );
+      return;
+    }
+
+    if (currentStepIndex === workspace.steps.length - 1) {
+      setStatusMessage(
+        "All required declarations are complete. Save the draft to keep the application current.",
+      );
+      return;
+    }
+
+    handleStepChange(nextStep.id);
   }
 
   function renderCompanySection() {
@@ -619,7 +1342,10 @@ function App() {
               onChange={(event) =>
                 updateSection("companyInfo", "legalName", event.target.value)
               }
+              onBlur={() => handleFieldBlur("companyInfo.legalName")}
+              error={getFieldError("companyInfo.legalName")}
               placeholder="Acme Holdings Corporation"
+              autoComplete="organization"
               required
             />
             <TextField
@@ -645,6 +1371,8 @@ function App() {
               onChange={(event) =>
                 updateSection("companyInfo", "registrationNumber", event.target.value)
               }
+              onBlur={() => handleFieldBlur("companyInfo.registrationNumber")}
+              error={getFieldError("companyInfo.registrationNumber")}
               placeholder="State file / registration number"
               required
             />
@@ -652,9 +1380,13 @@ function App() {
               label="Federal tax ID / EIN"
               value={workspace.companyInfo.taxId}
               onChange={(event) =>
-                updateSection("companyInfo", "taxId", event.target.value)
+                updateSection("companyInfo", "taxId", sanitizeEin(event.target.value))
               }
+              onBlur={() => handleFieldBlur("companyInfo.taxId")}
+              error={getFieldError("companyInfo.taxId")}
               placeholder="12-3456789"
+              inputMode="numeric"
+              maxLength={10}
               required
             />
             <TextField
@@ -664,15 +1396,20 @@ function App() {
               onChange={(event) =>
                 updateSection("companyInfo", "incorporationDate", event.target.value)
               }
+              onBlur={() => handleFieldBlur("companyInfo.incorporationDate")}
+              error={getFieldError("companyInfo.incorporationDate")}
               required
             />
-            <TextField
-              label="State / province of registration"
+            <SelectField
+              label="State of registration"
               value={workspace.companyInfo.incorporationState}
               onChange={(event) =>
                 updateSection("companyInfo", "incorporationState", event.target.value)
               }
-              placeholder="Delaware"
+              onBlur={() => handleFieldBlur("companyInfo.incorporationState")}
+              error={getFieldError("companyInfo.incorporationState")}
+              options={workspace.stateOptions}
+              placeholder="Select a state"
               required
             />
             <SelectField
@@ -689,11 +1426,14 @@ function App() {
             />
             <SelectField
               label="Primary industry"
-              value={workspace.companyInfo.industry || workspace.industryOptions[0]}
+              value={workspace.companyInfo.industry}
               onChange={(event) =>
                 updateSection("companyInfo", "industry", event.target.value)
               }
+              onBlur={() => handleFieldBlur("companyInfo.industry")}
+              error={getFieldError("companyInfo.industry")}
               options={workspace.industryOptions}
+              placeholder="Select an industry"
               required
             />
             <TextField
@@ -702,23 +1442,43 @@ function App() {
               onChange={(event) =>
                 updateSection("companyInfo", "website", event.target.value)
               }
+              onBlur={() => handleFieldBlur("companyInfo.website")}
+              error={getFieldError("companyInfo.website")}
               placeholder="https://www.company.com"
+              type="url"
+              autoComplete="url"
             />
             <TextField
               label="Annual revenue (USD)"
               value={workspace.companyInfo.annualRevenue}
               onChange={(event) =>
-                updateSection("companyInfo", "annualRevenue", event.target.value)
+                updateSection(
+                  "companyInfo",
+                  "annualRevenue",
+                  sanitizeCurrencyAmount(event.target.value),
+                )
               }
-              placeholder="25,000,000"
+              onBlur={() => handleFieldBlur("companyInfo.annualRevenue")}
+              error={getFieldError("companyInfo.annualRevenue")}
+              placeholder="25000000"
+              inputMode="numeric"
+              maxLength={MONEY_DIGIT_LIMIT}
             />
             <TextField
               label="Employee count"
               value={workspace.companyInfo.employeeCount}
               onChange={(event) =>
-                updateSection("companyInfo", "employeeCount", event.target.value)
+                updateSection(
+                  "companyInfo",
+                  "employeeCount",
+                  sanitizeWholeNumber(event.target.value),
+                )
               }
+              onBlur={() => handleFieldBlur("companyInfo.employeeCount")}
+              error={getFieldError("companyInfo.employeeCount")}
               placeholder="120"
+              inputMode="numeric"
+              maxLength={COUNT_DIGIT_LIMIT}
             />
           </div>
         </section>
@@ -748,7 +1508,10 @@ function App() {
               onChange={(event) =>
                 updateSection("primaryContact", "fullName", event.target.value)
               }
+              onBlur={() => handleFieldBlur("primaryContact.fullName")}
+              error={getFieldError("primaryContact.fullName")}
               placeholder="Jordan Lee"
+              autoComplete="name"
               required
             />
             <TextField
@@ -766,25 +1529,45 @@ function App() {
               onChange={(event) =>
                 updateSection("primaryContact", "email", event.target.value)
               }
+              onBlur={() => handleFieldBlur("primaryContact.email")}
+              error={getFieldError("primaryContact.email")}
               placeholder="jordan.lee@company.com"
+              autoComplete="email"
               required
             />
             <TextField
               label="Phone"
               value={workspace.primaryContact.phone}
               onChange={(event) =>
-                updateSection("primaryContact", "phone", event.target.value)
+                updateSection(
+                  "primaryContact",
+                  "phone",
+                  sanitizePhoneNumber(event.target.value),
+                )
               }
-              placeholder="+1 (000) 000-0000"
+              onBlur={() => handleFieldBlur("primaryContact.phone")}
+              error={getFieldError("primaryContact.phone")}
+              placeholder="4155550123"
+              inputMode="numeric"
+              maxLength={PHONE_DIGIT_LIMIT}
+              autoComplete="tel"
               required
             />
             <TextField
               label="Extension"
               value={workspace.primaryContact.extension}
               onChange={(event) =>
-                updateSection("primaryContact", "extension", event.target.value)
+                updateSection(
+                  "primaryContact",
+                  "extension",
+                  sanitizeExtension(event.target.value),
+                )
               }
+              onBlur={() => handleFieldBlur("primaryContact.extension")}
+              error={getFieldError("primaryContact.extension")}
               placeholder="204"
+              inputMode="numeric"
+              maxLength={EXTENSION_DIGIT_LIMIT}
             />
           </div>
         </section>
@@ -804,7 +1587,10 @@ function App() {
               onChange={(event) =>
                 updateSection("addresses", "registeredLine1", event.target.value)
               }
+              onBlur={() => handleFieldBlur("addresses.registeredLine1")}
+              error={getFieldError("addresses.registeredLine1")}
               placeholder="100 Market Street"
+              autoComplete="address-line1"
               required
             />
             <TextField
@@ -821,25 +1607,40 @@ function App() {
               onChange={(event) =>
                 updateSection("addresses", "city", event.target.value)
               }
+              onBlur={() => handleFieldBlur("addresses.city")}
+              error={getFieldError("addresses.city")}
               placeholder="San Francisco"
+              autoComplete="address-level2"
               required
             />
-            <TextField
-              label="State / province"
+            <SelectField
+              label="State"
               value={workspace.addresses.state}
               onChange={(event) =>
                 updateSection("addresses", "state", event.target.value)
               }
-              placeholder="California"
+              onBlur={() => handleFieldBlur("addresses.state")}
+              error={getFieldError("addresses.state")}
+              options={workspace.stateOptions}
+              placeholder="Select a state"
               required
             />
             <TextField
-              label="Postal code"
+              label="ZIP code"
               value={workspace.addresses.postalCode}
               onChange={(event) =>
-                updateSection("addresses", "postalCode", event.target.value)
+                updateSection(
+                  "addresses",
+                  "postalCode",
+                  sanitizePostalCode(event.target.value),
+                )
               }
+              onBlur={() => handleFieldBlur("addresses.postalCode")}
+              error={getFieldError("addresses.postalCode")}
               placeholder="94105"
+              inputMode="numeric"
+              maxLength={POSTAL_CODE_DIGIT_LIMIT}
+              autoComplete="postal-code"
               required
             />
             <SelectField
@@ -875,7 +1676,11 @@ function App() {
                 onChange={(event) =>
                   updateSection("addresses", "operatingLine1", event.target.value)
                 }
+                onBlur={() => handleFieldBlur("addresses.operatingLine1")}
+                error={getFieldError("addresses.operatingLine1")}
                 placeholder="250 Industrial Drive"
+                autoComplete="address-line1"
+                required
               />
               <TextField
                 label="Operating address line 2"
@@ -891,23 +1696,41 @@ function App() {
                 onChange={(event) =>
                   updateSection("addresses", "operatingCity", event.target.value)
                 }
+                onBlur={() => handleFieldBlur("addresses.operatingCity")}
+                error={getFieldError("addresses.operatingCity")}
                 placeholder="Oakland"
+                autoComplete="address-level2"
+                required
               />
-              <TextField
-                label="Operating state / province"
+              <SelectField
+                label="Operating state"
                 value={workspace.addresses.operatingState}
                 onChange={(event) =>
                   updateSection("addresses", "operatingState", event.target.value)
                 }
-                placeholder="California"
+                onBlur={() => handleFieldBlur("addresses.operatingState")}
+                error={getFieldError("addresses.operatingState")}
+                options={workspace.stateOptions}
+                placeholder="Select a state"
+                required
               />
               <TextField
-                label="Operating postal code"
+                label="Operating ZIP code"
                 value={workspace.addresses.operatingPostalCode}
                 onChange={(event) =>
-                  updateSection("addresses", "operatingPostalCode", event.target.value)
+                  updateSection(
+                    "addresses",
+                    "operatingPostalCode",
+                    sanitizePostalCode(event.target.value),
+                  )
                 }
+                onBlur={() => handleFieldBlur("addresses.operatingPostalCode")}
+                error={getFieldError("addresses.operatingPostalCode")}
                 placeholder="94607"
+                inputMode="numeric"
+                maxLength={POSTAL_CODE_DIGIT_LIMIT}
+                autoComplete="postal-code"
+                required
               />
               <SelectField
                 label="Operating country"
@@ -944,9 +1767,15 @@ function App() {
             onChange={(event) =>
               updateSection("bankingProfile", "accountPurpose", event.target.value)
             }
+            onBlur={() => handleFieldBlur("bankingProfile.accountPurpose")}
+            error={getFieldError("bankingProfile.accountPurpose")}
             placeholder="Describe expected receipts, disbursements, payroll, and treasury use."
             required
           />
+
+          {getFieldError("bankingProfile.requestedProducts") ? (
+            <p className="group-error-copy">{getFieldError("bankingProfile.requestedProducts")}</p>
+          ) : null}
 
           <div className="option-grid">
             {workspace.productOptions.map((product) => (
@@ -968,37 +1797,65 @@ function App() {
                 updateSection(
                   "bankingProfile",
                   "expectedOpeningDeposit",
-                  event.target.value,
+                  sanitizeCurrencyAmount(event.target.value),
                 )
               }
+              onBlur={() => handleFieldBlur("bankingProfile.expectedOpeningDeposit")}
+              error={getFieldError("bankingProfile.expectedOpeningDeposit")}
               placeholder="250000"
+              inputMode="numeric"
+              maxLength={MONEY_DIGIT_LIMIT}
               required
             />
             <TextField
               label="Estimated monthly incoming volume (USD)"
               value={workspace.bankingProfile.monthlyIncoming}
               onChange={(event) =>
-                updateSection("bankingProfile", "monthlyIncoming", event.target.value)
+                updateSection(
+                  "bankingProfile",
+                  "monthlyIncoming",
+                  sanitizeCurrencyAmount(event.target.value),
+                )
               }
+              onBlur={() => handleFieldBlur("bankingProfile.monthlyIncoming")}
+              error={getFieldError("bankingProfile.monthlyIncoming")}
               placeholder="900000"
+              inputMode="numeric"
+              maxLength={MONEY_DIGIT_LIMIT}
               required
             />
             <TextField
               label="Estimated monthly outgoing volume (USD)"
               value={workspace.bankingProfile.monthlyOutgoing}
               onChange={(event) =>
-                updateSection("bankingProfile", "monthlyOutgoing", event.target.value)
+                updateSection(
+                  "bankingProfile",
+                  "monthlyOutgoing",
+                  sanitizeCurrencyAmount(event.target.value),
+                )
               }
+              onBlur={() => handleFieldBlur("bankingProfile.monthlyOutgoing")}
+              error={getFieldError("bankingProfile.monthlyOutgoing")}
               placeholder="720000"
+              inputMode="numeric"
+              maxLength={MONEY_DIGIT_LIMIT}
               required
             />
             <TextField
               label="Number of online banking users"
               value={workspace.bankingProfile.onlineBankingUsers}
               onChange={(event) =>
-                updateSection("bankingProfile", "onlineBankingUsers", event.target.value)
+                updateSection(
+                  "bankingProfile",
+                  "onlineBankingUsers",
+                  sanitizeWholeNumber(event.target.value),
+                )
               }
+              onBlur={() => handleFieldBlur("bankingProfile.onlineBankingUsers")}
+              error={getFieldError("bankingProfile.onlineBankingUsers")}
               placeholder="2"
+              inputMode="numeric"
+              maxLength={COUNT_DIGIT_LIMIT}
             />
             <TextField
               label="Foreign jurisdictions involved"
@@ -1075,6 +1932,8 @@ function App() {
                 index={index}
                 canRemove={workspace.beneficialOwners.length > 1}
                 onFieldChange={(field, value) => updateOwner(owner.id, field, value)}
+                onFieldBlur={handleFieldBlur}
+                getFieldError={getFieldError}
                 onToggleSigner={(event) =>
                   updateOwner(owner.id, "isAuthorizedSigner", event.target.checked)
                 }
@@ -1228,12 +2087,24 @@ function App() {
               <button
                 type="button"
                 className="secondary-button"
-                onClick={() => handleStepChange(nextStep.id)}
+                onClick={handleContinue}
               >
                 Continue
               </button>
             </div>
           </section>
+
+          {currentStepValidationMessages.length ? (
+            <section className="validation-banner" aria-live="polite">
+              <p className="section-eyebrow">Action needed</p>
+              <strong>Please resolve the highlighted fields before continuing.</strong>
+              <div className="validation-list">
+                {currentStepValidationMessages.slice(0, 3).map((message) => (
+                  <p key={message}>{message}</p>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <div className="section-stack">{renderActiveSection()}</div>
 
@@ -1249,7 +2120,7 @@ function App() {
             <button
               type="button"
               className="primary-button"
-              onClick={() => handleStepChange(nextStep.id)}
+              onClick={handleContinue}
             >
               {currentStepIndex === workspace.steps.length - 1
                 ? "Review application"
@@ -1303,13 +2174,13 @@ function App() {
           <div className="summary-card">
             <p className="section-eyebrow">Outstanding items</p>
             <div className="issue-list">
-              {missingItems.map((item) => (
+              {uniqueMissingItems.map((item) => (
                 <div key={item} className="issue-item">
                   <span className="issue-dot" aria-hidden="true" />
                   <p>{item}</p>
                 </div>
               ))}
-              {!missingItems.length ? (
+              {!uniqueMissingItems.length ? (
                 <div className="issue-item complete">
                   <span className="issue-dot" aria-hidden="true" />
                   <p>The application includes the core information required for review.</p>

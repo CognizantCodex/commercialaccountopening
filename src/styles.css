@@ -14,6 +14,8 @@
   --warning: #ae7446;
   --warning-soft: rgba(174, 116, 70, 0.14);
   --success: #2f8a57;
+  --danger: #c04d3f;
+  --danger-soft: rgba(192, 77, 63, 0.12);
   --shadow: 0 24px 60px rgba(20, 34, 53, 0.08);
   font-family: "Manrope", sans-serif;
   color: var(--ink);
@@ -268,6 +270,31 @@ button {
   margin-bottom: 18px;
 }
 
+.validation-banner {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(192, 77, 63, 0.28);
+  background: linear-gradient(180deg, rgba(255, 247, 244, 0.96), #fff);
+}
+
+.validation-banner strong {
+  display: block;
+  margin-top: 8px;
+  color: #7d2c20;
+}
+
+.validation-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.validation-list p {
+  margin: 0;
+  color: #8c4338;
+  line-height: 1.55;
+}
+
 .stage-banner p:last-child,
 .section-heading p,
 .rail-block p,
@@ -374,6 +401,10 @@ button {
   letter-spacing: 0.12em;
 }
 
+.field.has-error span small {
+  color: var(--danger);
+}
+
 .field input,
 .field textarea,
 .field select {
@@ -402,8 +433,34 @@ button {
   background: #fcfffe;
 }
 
+.field.has-error input,
+.field.has-error textarea,
+.field.has-error select {
+  border-color: rgba(192, 77, 63, 0.55);
+  background: rgba(255, 249, 247, 0.95);
+}
+
+.field.has-error input:focus,
+.field.has-error textarea:focus,
+.field.has-error select:focus {
+  border-color: rgba(192, 77, 63, 0.7);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
 .field-textarea {
   margin-top: 2px;
+}
+
+.field-error-copy,
+.group-error-copy {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.group-error-copy {
+  margin: -2px 0 14px;
 }
 
 .option-grid {
