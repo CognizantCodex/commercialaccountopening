@@ -1,0 +1,61 @@
+import { AnimatePresence } from 'framer-motion';
+import { useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { Breadcrumbs } from '@/app/layout/Breadcrumbs';
+import { CommandPalette } from '@/app/layout/CommandPalette';
+import { DecisionBrief } from '@/app/layout/DecisionBrief';
+import { DemoControlBar } from '@/app/layout/DemoControlBar';
+import { GlobalHotkeys } from '@/app/layout/GlobalHotkeys';
+import { SidebarNav } from '@/app/layout/SidebarNav';
+import { TopBar } from '@/app/layout/TopBar';
+import { AnimatedPage } from '@/components/animations/AnimatedPage';
+import { RouteAnnouncer } from '@/components/feedback/RouteAnnouncer';
+import { usePlatformStore } from '@/store';
+import { routeCatalog, routeOrder } from '@/services/selectors';
+
+function getRouteFromPath(pathname: string) {
+  const route = pathname.replace('/', '');
+  return routeOrder.includes(route as (typeof routeOrder)[number])
+    ? (route as (typeof routeOrder)[number])
+    : 'executive';
+}
+
+export function AppShell() {
+  const location = useLocation();
+  const currentRoute = getRouteFromPath(location.pathname);
+  const navigateToView = usePlatformStore((state) => state.navigateToView);
+
+  useEffect(() => {
+    navigateToView(currentRoute);
+    document.title = `${routeCatalog[currentRoute].title} | KYC North Star Intelligence Platform`;
+  }, [currentRoute, navigateToView]);
+
+  return (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <GlobalHotkeys />
+      <RouteAnnouncer />
+      <CommandPalette />
+      <aside className="hidden border-r border-[var(--border)] bg-[color:rgba(11,15,23,0.72)] lg:block lg:w-80 lg:shrink-0 lg:backdrop-blur-xl">
+        <SidebarNav />
+      </aside>
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <TopBar />
+        <div className="border-b border-[var(--border)] px-4 py-3 lg:hidden">
+          <SidebarNav compact />
+        </div>
+        <DemoControlBar />
+        <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6">
+            <Breadcrumbs />
+            <DecisionBrief route={currentRoute} />
+            <AnimatePresence mode="wait">
+              <AnimatedPage key={location.pathname}>
+                <Outlet />
+              </AnimatedPage>
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
