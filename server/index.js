@@ -1,6 +1,7 @@
 import { access, mkdir, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { submitCheckRiskApplication } from "./checkRiskApi.js";
 import { submitCheckKycApplication } from "./checkKycApi.js";
@@ -14,10 +15,25 @@ import { defaultWorkspace } from "../src/defaultWorkspace.js";
 const PORT = Number(process.env.PORT ?? 8080);
 const PRIMARY_DRAFT_ID = "corporate-account-opening";
 const dataDir = new URL("./data/", import.meta.url);
+const kycFabricDistDir = fileURLToPath(new URL("../frontend/dist/", import.meta.url));
 const databasePath = fileURLToPath(
   new URL("./data/corporate-account-opening.sqlite", import.meta.url),
 );
 const legacyWorkspacePath = new URL("./data/workspace-store.json", import.meta.url);
+
+const STATIC_CONTENT_TYPES = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
 
 function json(value, statusCode = 200) {
   return {
@@ -222,6 +238,54 @@ function readRequestBody(request) {
   });
 }
 
+async function serveKycFabricAsset(pathname, response) {
+  const routePath = pathname.replace(/^\/kyc-fabric\/?/, "");
+  const isAssetRequest = routePath.startsWith("assets/");
+  const relativePath = isAssetRequest && routePath ? routePath : "index.html";
+
+  if (relativePath.includes("..")) {
+    response.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+    response.end("Forbidden");
+    return true;
+  }
+
+  const assetPath = path.join(kycFabricDistDir, relativePath);
+
+  try {
+    const body = await readFile(assetPath);
+    const extension = path.extname(assetPath).toLowerCase();
+    response.writeHead(200, {
+      "Content-Type":
+        STATIC_CONTENT_TYPES[extension] ?? "application/octet-stream",
+      "Cache-Control": isAssetRequest ? "public, max-age=31536000, immutable" : "no-cache",
+    });
+    response.end(body);
+    return true;
+  } catch {
+    if (!isAssetRequest) {
+      try {
+        const indexHtml = await readFile(path.join(kycFabricDistDir, "index.html"));
+        response.writeHead(200, {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-cache",
+        });
+        response.end(indexHtml);
+        return true;
+      } catch {
+        const result = json(
+          { error: "KYC Fabric bundle is not built yet." },
+          503,
+        );
+        response.writeHead(result.statusCode, result.headers);
+        response.end(result.body);
+        return true;
+      }
+    }
+
+    return false;
+  }
+}
+
 const server = createServer(async (request, response) => {
   try {
     if (!request.url) {
@@ -241,6 +305,14 @@ const server = createServer(async (request, response) => {
       });
       response.end();
       return;
+    }
+
+    if (request.method === "GET" && url.pathname.startsWith("/kyc-fabric")) {
+      const handled = await serveKycFabricAsset(url.pathname, response);
+
+      if (handled) {
+        return;
+      }
     }
 
     if (request.method === "GET" && url.pathname === "/api/account-opening/health") {

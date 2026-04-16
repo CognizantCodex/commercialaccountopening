@@ -11,6 +11,7 @@ const COUNT_DIGIT_LIMIT = 6;
 const OWNERSHIP_PERCENT_DECIMAL_LIMIT = 2;
 const OWNERSHIP_PERCENT_WHOLE_LIMIT = 3;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const KYC_FABRIC_URL = "/kyc-fabric/executive";
 
 function createOwner(id = `owner-${Date.now()}`) {
   return {
@@ -2323,6 +2324,15 @@ function App() {
           <p className="brand-mark">{workspace.brandName}</p>
           <h1>{workspace.formTitle}</h1>
           <p>{workspace.intro}</p>
+          <div className="hero-actions">
+            <a className="hero-link" href={KYC_FABRIC_URL}>
+              Open KYC Fabric workspace
+            </a>
+            <p className="hero-link-copy">
+              Review the merged KYC Fabric experience in a dedicated intelligence
+              dashboard.
+            </p>
+          </div>
         </div>
         <div className="hero-meta">
           <SummaryChip label="Completion" value={`${completionPercentage}%`} tone="accent" />
