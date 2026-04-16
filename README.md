@@ -17,6 +17,8 @@ This repo now contains:
 - Stack: Node.js using the built-in `http` module
 - API: `POST /api/evaluate`
 - Health: `GET /api/health`
+- AML Agent: `POST /api/aml/check_transaction`
+- AML Case Review: `POST /api/aml/review_case`
 - Port: `8080`
 
 ## Run locally
@@ -43,3 +45,42 @@ Open `http://localhost:5173`.
 
 - `cd backend && npm test`
 - `cd frontend && npm run build`
+
+## AML JSON endpoints
+
+### Check transaction
+
+```json
+POST /api/aml/check_transaction
+{
+  "tx_id": "TX-9001",
+  "transaction": {
+    "txId": "TX-9001",
+    "description": "Abrupt geographical shift with layering pattern",
+    "geoShift": true,
+    "velocitySpike": true,
+    "layeringIndicator": true
+  },
+  "internal_kyc_vault": {
+    "summary": "Customer already marked for enhanced due diligence."
+  },
+  "adverse_media_api": {
+    "summary": "Negative media references potential money laundering investigation."
+  }
+}
+```
+
+### Review case
+
+```json
+POST /api/aml/review_case
+{
+  "case_id": "CASE-77",
+  "riskLevel": "High",
+  "confidenceScore": 91,
+  "caseSummary": "AML case awaiting senior analyst approval.",
+  "review": {
+    "analystId": "analyst_id_101"
+  }
+}
+```

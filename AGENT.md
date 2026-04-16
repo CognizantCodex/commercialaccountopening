@@ -16,6 +16,7 @@ The current UI and backend are optimized around three specialist agents:
 - KYC Agent
 - Credit Agent
 - Risk Agent
+- AML-Pro-Agent
 
 ## Shared Non-Negotiable Rules
 Every agent in this project must follow these rules:
@@ -61,6 +62,21 @@ Decision posture:
 - MANUAL_REVIEW if any prior stage is MANUAL_REVIEW or expected context is missing
 - APPROVED only when all expected upstream stages are APPROVED and consistent
 
+### 4. AML-Pro-Agent
+Primary responsibility:
+- Investigate AML alerts from transaction monitoring
+- Gather KYC context and adverse media evidence
+- Produce explainable risk assessments and SAR drafts
+
+Decision posture:
+- Low risk when supplied evidence does not show meaningful suspicious activity
+- Med risk when the case is elevated but not conclusively high risk
+- High risk when layering, sanctions, fraud, severe adverse media, or other explicit suspicious activity is present
+
+Human control:
+- High-risk cases must not be closed without `analyst_id_101` review
+- Every investigation step must be audit logged
+
 ## Output Contract
 Each agent should align to this JSON shape:
 
@@ -92,3 +108,4 @@ The UI should emphasize:
 The backend should remain deterministic and conservative.
 Prompt files in `agents/` serve as LLM-ready rulebooks for future orchestration or prompt injection.
 If runtime LLM integration is added later, prompts must preserve the same JSON contract and non-negotiable rules.
+The AML server-side agent also returns JSON-only integration responses for `/api/aml/check_transaction` and `/api/aml/review_case`.

@@ -18,6 +18,41 @@ interface EvaluationResponse {
   details?: string;
 }
 
+type AmlMode = 'check_transaction' | 'review_case';
+
+interface AmlResponse {
+  agent: string;
+  version: string;
+  command: string;
+  investigationId?: string;
+  caseId?: string;
+  txId?: string;
+  status?: string;
+  reviewStatus?: string;
+  riskLevel?: string;
+  alertConfidence?: number;
+  confidenceScore?: number;
+  caseSummary?: string;
+  recommendedActions?: string[];
+  requiresSeniorAnalystReview?: boolean;
+  requiredReviewer?: string | null;
+  sarDraft?: string | null;
+  explainability?: {
+    why?: string[];
+    evidence?: Record<string, unknown>;
+  };
+  audit?: {
+    directory?: string;
+    steps?: Array<{
+      action: string;
+      why: string;
+      auditPath: string;
+    }>;
+  };
+  error?: string;
+  details?: string;
+}
+
 const scenarioCatalog: Record<
   ScenarioKey,
   {
@@ -241,6 +276,53 @@ const emptyResponse: EvaluationResponse = {
   keyFactors: ['No decision has been generated yet.'],
 };
 
+const amlSamples: Record<AmlMode, Record<string, unknown>> = {
+  check_transaction: {
+    tx_id: 'TX-9001',
+    case_id: 'CASE-9001',
+    transaction: {
+      txId: 'TX-9001',
+      description: 'Abrupt geographical shift with layering pattern',
+      patternSummary: 'Rapid movement through multiple counterparties',
+      flags: ['layering', 'high-risk jurisdiction'],
+      monitoringNotes: ['velocity change observed'],
+      geoShift: true,
+      velocitySpike: true,
+      layeringIndicator: true,
+    },
+    internal_kyc_vault: {
+      summary: 'Customer already marked for enhanced due diligence.',
+      riskNotes: 'High risk corridor exposure',
+    },
+    adverse_media_api: {
+      summary: 'Negative media references possible money laundering investigation.',
+    },
+    subject: {
+      name: 'Redacted Subject',
+    },
+  },
+  review_case: {
+    case_id: 'CASE-77',
+    riskLevel: 'High',
+    confidenceScore: 91,
+    caseSummary: 'AML case awaiting senior analyst approval.',
+    review: {
+      analystId: 'analyst_id_101',
+    },
+    evidence: {
+      trigger: 'Layering and adverse media match',
+    },
+  },
+};
+
+const emptyAmlResponse: AmlResponse = {
+  agent: 'AML-Pro-Agent',
+  version: '2026.1',
+  command: '/check_transaction',
+  caseSummary: 'Run an AML request to see the JSON response.',
+  recommendedActions: ['No AML response generated yet.'],
+};
+
 function toneClasses(decision: string) {
   if (decision === 'APPROVED') {
     return 'border-[color:rgba(46,160,67,0.35)] bg-[color:rgba(46,160,67,0.12)] text-[var(--success)]';
@@ -259,6 +341,12 @@ export function OnboardingView() {
   );
   const [result, setResult] = useState<EvaluationResponse>(emptyResponse);
   const [status, setStatus] = useState('Loaded Good User');
+  const [amlMode, setAmlMode] = useState<AmlMode>('check_transaction');
+  const [amlRequestBody, setAmlRequestBody] = useState(
+    JSON.stringify(amlSamples.check_transaction, null, 2),
+  );
+  const [amlResult, setAmlResult] = useState<AmlResponse>(emptyAmlResponse);
+  const [amlStatus, setAmlStatus] = useState('Loaded AML transaction sample');
 
   const activeScenario = scenarioCatalog[scenario];
   const activeAgent = useMemo(
@@ -277,6 +365,16 @@ export function OnboardingView() {
     const parsed = JSON.parse(rawText) as Record<string, unknown>;
     parsed.stage = nextStage;
     return JSON.stringify(parsed, null, 2);
+  }
+
+  function loadAmlSample(nextMode: AmlMode) {
+    setAmlMode(nextMode);
+    setAmlRequestBody(JSON.stringify(amlSamples[nextMode], null, 2));
+    setAmlStatus(
+      nextMode === 'check_transaction'
+        ? 'Loaded AML transaction sample'
+        : 'Loaded AML case review sample',
+    );
   }
 
   async function evaluate() {
@@ -331,6 +429,11 @@ export function OnboardingView() {
     setStatus('JSON copied');
   }
 
+  async function copyAmlJson() {
+    await navigator.clipboard.writeText(JSON.stringify(amlResult, null, 2));
+    setAmlStatus('AML JSON copied');
+  }
+
   function formatJson() {
     try {
       setRequestBody(syncStageIntoPayload(stage, requestBody));
@@ -344,6 +447,74 @@ export function OnboardingView() {
         keyFactors: [message],
         error: 'Invalid JSON input',
         details: message,
+      });
+    }
+  }
+
+  function formatAmlJson() {
+    try {
+      const parsed = JSON.parse(amlRequestBody) as Record<string, unknown>;
+      setAmlRequestBody(JSON.stringify(parsed, null, 2));
+      setAmlStatus('AML JSON formatted');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown parse error';
+      setAmlStatus('Invalid AML JSON');
+      setAmlResult({
+        ...emptyAmlResponse,
+        error: 'Invalid AML JSON input',
+        details: message,
+        caseSummary: 'The AML payload is invalid and could not be formatted.',
+        recommendedActions: [message],
+      });
+    }
+  }
+
+  async function runAmlRequest() {
+    let payload: Record<string, unknown>;
+
+    try {
+      payload = JSON.parse(amlRequestBody) as Record<string, unknown>;
+      setAmlRequestBody(JSON.stringify(payload, null, 2));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown parse error';
+      setAmlStatus('Invalid AML JSON');
+      setAmlResult({
+        ...emptyAmlResponse,
+        error: 'Invalid AML JSON input',
+        details: message,
+        caseSummary: 'The AML payload is invalid and could not be evaluated.',
+        recommendedActions: [message],
+      });
+      return;
+    }
+
+    setAmlStatus('Running AML agent');
+
+    try {
+      const endpoint =
+        amlMode === 'check_transaction'
+          ? '/api/aml/check_transaction'
+          : '/api/aml/review_case';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = (await response.json()) as AmlResponse;
+      if (!response.ok) {
+        throw new Error(data.error ?? 'AML request failed');
+      }
+      setAmlResult(data);
+      setAmlStatus(data.status ?? data.reviewStatus ?? 'AML response ready');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown request error';
+      setAmlStatus('AML request failed');
+      setAmlResult({
+        ...emptyAmlResponse,
+        error: 'AML request failed',
+        details: message,
+        caseSummary: 'The AML agent could not complete the request.',
+        recommendedActions: [message],
       });
     }
   }
@@ -601,6 +772,144 @@ export function OnboardingView() {
               <li>Specialist agent rulebooks remain in <code>AGENT.md</code> and <code>agents/</code>.</li>
             </ul>
           </div>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <Badge variant="danger">Anti Money Laundering</Badge>
+              <h3 className="mt-3 text-2xl font-semibold text-[var(--foreground)]">
+                AML test interface
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
+                Load a sample request, hit the AML-Pro-Agent endpoint, and inspect the JSON response for system integration.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={amlMode === 'check_transaction' ? 'primary' : 'secondary'}
+                onClick={() => loadAmlSample('check_transaction')}
+              >
+                /check_transaction
+              </Button>
+              <Button
+                type="button"
+                variant={amlMode === 'review_case' ? 'primary' : 'secondary'}
+                onClick={() => loadAmlSample('review_case')}
+              >
+                /review_case
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              AML API details
+            </p>
+            <ul className="mt-3 grid gap-2 text-sm leading-6 text-[var(--muted-foreground)]">
+              <li>Base URL: <code>http://localhost:8080</code></li>
+              <li>Check transaction: <code>POST /api/aml/check_transaction</code></li>
+              <li>Review case: <code>POST /api/aml/review_case</code></li>
+              <li>Response mode: <code>application/json</code></li>
+            </ul>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Button type="button" variant="primary" onClick={() => void runAmlRequest()}>
+              Run AML request
+            </Button>
+            <Button type="button" variant="secondary" onClick={formatAmlJson}>
+              Format AML JSON
+            </Button>
+            <Button type="button" variant="ghost" onClick={loadAmlSample.bind(null, amlMode)}>
+              Reload sample
+            </Button>
+          </div>
+
+          <textarea
+            className="mt-5 min-h-[28rem] w-full rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(8,11,17,0.72)] p-4 font-mono text-sm leading-7 text-[var(--foreground)] outline-none"
+            spellCheck={false}
+            value={amlRequestBody}
+            onChange={(event) => setAmlRequestBody(event.target.value)}
+          />
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Badge variant="warning">AML response</Badge>
+              <h3 className="mt-3 text-2xl font-semibold text-[var(--foreground)]">
+                JSON output for testing
+              </h3>
+            </div>
+            <Button type="button" variant="ghost" onClick={() => void copyAmlJson()}>
+              <Copy className="h-4 w-4" />
+              Copy AML JSON
+            </Button>
+          </div>
+
+          <div className="mt-4 rounded-full border border-[var(--border)] bg-[color:rgba(248,81,73,0.08)] px-4 py-2 text-sm font-medium text-[var(--foreground)]">
+            {amlStatus}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+                Risk level
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                {amlResult.riskLevel ?? '-'}
+              </p>
+            </div>
+            <div className="rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+                Confidence
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+                {amlResult.alertConfidence ?? amlResult.confidenceScore ?? '-'}
+              </p>
+            </div>
+            <div className="rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+              <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+                Status
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[var(--foreground)]">
+                {amlResult.status ?? amlResult.reviewStatus ?? '-'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              Case summary
+            </p>
+            <p className="mt-3 text-sm leading-7 text-[var(--muted-foreground)]">
+              {amlResult.caseSummary}
+            </p>
+            {amlResult.details ? (
+              <p className="mt-2 text-sm text-[var(--danger)]">{amlResult.details}</p>
+            ) : null}
+          </div>
+
+          <div className="mt-5 rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              Recommended actions
+            </p>
+            <ul className="mt-3 grid gap-3 text-sm leading-6 text-[var(--muted-foreground)]">
+              {(amlResult.recommendedActions ?? ['No AML response generated yet.']).map((action) => (
+                <li key={action} className="rounded-[1rem] border border-[var(--border)] px-3 py-2">
+                  {action}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <pre className="mt-5 overflow-auto rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(8,11,17,0.72)] p-4 text-sm leading-7 text-[var(--foreground)]">
+            {JSON.stringify(amlResult, null, 2)}
+          </pre>
         </Card>
       </section>
     </div>

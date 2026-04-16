@@ -1,0 +1,533 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AML Pro Agent API",
+    "version": "2026.1",
+    "description": "Swagger-style API definition for the Node.js Anti Money Laundering investigation and case review endpoints."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Service availability checks"
+    },
+    {
+      "name": "AML",
+      "description": "Anti Money Laundering investigation and review endpoints"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/aml/check_transaction": {
+      "post": {
+        "tags": ["AML"],
+        "summary": "Run AML transaction investigation",
+        "description": "Initiates the AML-Pro-Agent investigation workflow for a transaction, including transaction monitoring, KYC lookup, adverse media analysis, explainability, and SAR drafting for high-risk cases.",
+        "operationId": "checkTransaction",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckTransactionRequest"
+              },
+              "example": {
+                "tx_id": "TX-9001",
+                "case_id": "CASE-9001",
+                "transaction": {
+                  "txId": "TX-9001",
+                  "description": "Abrupt geographical shift with layering pattern",
+                  "patternSummary": "Rapid movement through multiple counterparties",
+                  "flags": ["layering", "high-risk jurisdiction"],
+                  "monitoringNotes": ["velocity change observed"],
+                  "geoShift": true,
+                  "velocitySpike": true,
+                  "layeringIndicator": true
+                },
+                "internal_kyc_vault": {
+                  "summary": "Customer already marked for enhanced due diligence.",
+                  "riskNotes": "High risk corridor exposure"
+                },
+                "adverse_media_api": {
+                  "summary": "Negative media references possible money laundering investigation."
+                },
+                "subject": {
+                  "name": "Redacted Subject"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AML investigation completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckTransactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/aml/review_case": {
+      "post": {
+        "tags": ["AML"],
+        "summary": "Review AML case for submission",
+        "description": "Reviews a pending AML case and enforces the human-in-the-loop requirement for high-risk investigations.",
+        "operationId": "reviewCase",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewCaseRequest"
+              },
+              "example": {
+                "case_id": "CASE-77",
+                "riskLevel": "High",
+                "confidenceScore": 91,
+                "caseSummary": "AML case awaiting senior analyst approval.",
+                "review": {
+                  "analystId": "analyst_id_101"
+                },
+                "evidence": {
+                  "trigger": "Layering and adverse media match"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AML case review completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewCaseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          }
+        },
+        "required": ["status"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": ["error"]
+      },
+      "TransactionInput": {
+        "type": "object",
+        "properties": {
+          "txId": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "patternSummary": {
+            "type": "string"
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "monitoringNotes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "geoShift": {
+            "type": "boolean"
+          },
+          "velocitySpike": {
+            "type": "boolean"
+          },
+          "layeringIndicator": {
+            "type": "boolean"
+          }
+        }
+      },
+      "KycVaultInput": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "riskNotes": {
+            "type": "string"
+          }
+        }
+      },
+      "AdverseMediaInput": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "string"
+          },
+          "headline": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        }
+      },
+      "SubjectInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CheckTransactionRequest": {
+        "type": "object",
+        "properties": {
+          "tx_id": {
+            "type": "string"
+          },
+          "case_id": {
+            "type": "string"
+          },
+          "transaction": {
+            "$ref": "#/components/schemas/TransactionInput"
+          },
+          "internal_kyc_vault": {
+            "$ref": "#/components/schemas/KycVaultInput"
+          },
+          "adverse_media_api": {
+            "$ref": "#/components/schemas/AdverseMediaInput"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/SubjectInput"
+          }
+        },
+        "required": ["tx_id"]
+      },
+      "AuditStep": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "auditPath": {
+            "type": "string"
+          }
+        },
+        "required": ["action", "why", "evidence", "auditPath"]
+      },
+      "AuditEnvelope": {
+        "type": "object",
+        "properties": {
+          "directory": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditStep"
+            }
+          }
+        },
+        "required": ["directory", "steps"]
+      },
+      "MonitoringEvidence": {
+        "type": "object",
+        "properties": {
+          "alertGenerated": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "integer"
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["alertGenerated", "score", "triggers"]
+      },
+      "ExplainabilityEvidence": {
+        "type": "object",
+        "properties": {
+          "transactionMonitoring": {
+            "$ref": "#/components/schemas/MonitoringEvidence"
+          },
+          "kyc": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "adverseMedia": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ExplainabilityEnvelope": {
+        "type": "object",
+        "properties": {
+          "why": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["why", "evidence"]
+      },
+      "CheckTransactionResponse": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "string",
+            "example": "AML-Pro-Agent"
+          },
+          "version": {
+            "type": "string",
+            "example": "2026.1"
+          },
+          "command": {
+            "type": "string",
+            "example": "/check_transaction"
+          },
+          "investigationId": {
+            "type": "string"
+          },
+          "txId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ALERT_GENERATED", "NO_ALERT"]
+          },
+          "riskLevel": {
+            "type": "string",
+            "enum": ["Low", "Med", "High"]
+          },
+          "alertConfidence": {
+            "type": "integer"
+          },
+          "caseSummary": {
+            "type": "string"
+          },
+          "recommendedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiresSeniorAnalystReview": {
+            "type": "boolean"
+          },
+          "requiredReviewer": {
+            "type": ["string", "null"]
+          },
+          "sarDraft": {
+            "type": ["string", "null"]
+          },
+          "explainability": {
+            "$ref": "#/components/schemas/ExplainabilityEnvelope"
+          },
+          "audit": {
+            "$ref": "#/components/schemas/AuditEnvelope"
+          }
+        },
+        "required": [
+          "agent",
+          "version",
+          "command",
+          "investigationId",
+          "txId",
+          "status",
+          "riskLevel",
+          "alertConfidence",
+          "caseSummary",
+          "recommendedActions",
+          "requiresSeniorAnalystReview",
+          "requiredReviewer",
+          "sarDraft",
+          "explainability",
+          "audit"
+        ]
+      },
+      "ReviewCaseRequest": {
+        "type": "object",
+        "properties": {
+          "case_id": {
+            "type": "string"
+          },
+          "riskLevel": {
+            "type": "string",
+            "enum": ["Low", "Med", "High"]
+          },
+          "confidenceScore": {
+            "type": "integer"
+          },
+          "caseSummary": {
+            "type": "string"
+          },
+          "review": {
+            "type": "object",
+            "properties": {
+              "analystId": {
+                "type": "string"
+              }
+            }
+          },
+          "evidence": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["case_id"]
+      },
+      "ReviewCaseResponse": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "string",
+            "example": "AML-Pro-Agent"
+          },
+          "version": {
+            "type": "string",
+            "example": "2026.1"
+          },
+          "command": {
+            "type": "string",
+            "example": "/review_case"
+          },
+          "caseId": {
+            "type": "string"
+          },
+          "reviewStatus": {
+            "type": "string",
+            "enum": ["READY_FOR_SUBMISSION", "PENDING_SENIOR_REVIEW"]
+          },
+          "riskLevel": {
+            "type": "string",
+            "enum": ["Low", "Med", "High"]
+          },
+          "confidenceScore": {
+            "type": "integer"
+          },
+          "caseSummary": {
+            "type": "string"
+          },
+          "recommendedActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiresSeniorAnalystReview": {
+            "type": "boolean"
+          },
+          "requiredReviewer": {
+            "type": ["string", "null"]
+          },
+          "explainability": {
+            "$ref": "#/components/schemas/ExplainabilityEnvelope"
+          },
+          "audit": {
+            "$ref": "#/components/schemas/AuditEnvelope"
+          }
+        },
+        "required": [
+          "agent",
+          "version",
+          "command",
+          "caseId",
+          "reviewStatus",
+          "riskLevel",
+          "confidenceScore",
+          "caseSummary",
+          "recommendedActions",
+          "requiresSeniorAnalystReview",
+          "requiredReviewer",
+          "explainability",
+          "audit"
+        ]
+      }
+    }
+  }
+}
