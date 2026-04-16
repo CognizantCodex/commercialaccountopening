@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-elevated: rgba(22, 27, 34, 0.78);
+  --surface-strong: rgba(31, 41, 55, 0.88);
+  --surface-soft: rgba(13, 17, 23, 0.62);
+  --foreground: #f0f6fc;
+  --muted-foreground: #8b949e;
+  --border: rgba(139, 148, 158, 0.22);
+  --border-strong: rgba(240, 246, 252, 0.12);
+  --accent: #00c9b1;
+  --accent-secondary: #1f6feb;
+  --success: #2ea043;
+  --warning: #f2cc60;
+  --danger: #f85149;
+  --chart-1: #00c9b1;
+  --chart-2: #1f6feb;
+  --chart-3: #f2cc60;
+  --chart-4: #f85149;
+  --chart-5: #2ea043;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.75rem;
+  --shadow-card: 0 24px 64px rgba(0, 0, 0, 0.24);
+  --shadow-soft: 0 12px 36px rgba(0, 0, 0, 0.18);
+  --page-gradient:
+    radial-gradient(circle at top right, rgba(31, 111, 235, 0.18), transparent 25%),
+    radial-gradient(circle at top left, rgba(0, 201, 177, 0.12), transparent 26%),
+    linear-gradient(180deg, rgba(13, 17, 23, 0.96), rgba(8, 11, 17, 1));
+  font-family:
+    Inter, "SF Pro Display", "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+html.light {
+  color-scheme: light;
+  --bg: #f5f9ff;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-elevated: rgba(255, 255, 255, 0.96);
+  --surface-strong: rgba(239, 245, 255, 0.96);
+  --surface-soft: rgba(226, 234, 247, 0.68);
+  --foreground: #0f172a;
+  --muted-foreground: #475569;
+  --border: rgba(15, 23, 42, 0.12);
+  --border-strong: rgba(15, 23, 42, 0.1);
+  --shadow-card: 0 22px 48px rgba(15, 23, 42, 0.12);
+  --shadow-soft: 0 12px 28px rgba(15, 23, 42, 0.08);
+  --page-gradient:
+    radial-gradient(circle at top right, rgba(31, 111, 235, 0.1), transparent 30%),
+    radial-gradient(circle at top left, rgba(0, 201, 177, 0.12), transparent 24%),
+    linear-gradient(180deg, #f6fbff, #eef5fb);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--page-gradient);
+  color: var(--foreground);
+  text-rendering: optimizeLegibility;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 72px 72px;
+  content: "";
+  mask-image: radial-gradient(circle at center, black, transparent 85%);
+  pointer-events: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(0, 201, 177, 0.32);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(0, 201, 177, 0.95);
+  outline-offset: 2px;
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+  backdrop-filter: blur(28px);
+}
+
+.light .glass-panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.68));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

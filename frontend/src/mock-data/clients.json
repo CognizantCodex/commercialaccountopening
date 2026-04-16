@@ -1,0 +1,52 @@
+[
+  {
+    "id": "client-aurora",
+    "name": "Aurora Atlas Capital",
+    "segment": "Global Bank",
+    "headquarters": "New York, United States",
+    "region": "North America",
+    "coordinates": [-74.006, 40.7128],
+    "sector": "Investment Banking",
+    "annualRevenueUsd": 18400000000
+  },
+  {
+    "id": "client-orion",
+    "name": "Orion Maritime Finance",
+    "segment": "Corporate Treasury",
+    "headquarters": "London, United Kingdom",
+    "region": "Europe",
+    "coordinates": [-0.1276, 51.5072],
+    "sector": "Shipping Finance",
+    "annualRevenueUsd": 6200000000
+  },
+  {
+    "id": "client-meridian",
+    "name": "Meridian Commodities Group",
+    "segment": "Large Enterprise",
+    "headquarters": "Singapore",
+    "region": "APAC",
+    "coordinates": [103.8198, 1.3521],
+    "sector": "Commodities",
+    "annualRevenueUsd": 9700000000
+  },
+  {
+    "id": "client-lattice",
+    "name": "Lattice Family Office",
+    "segment": "Wealth Platform",
+    "headquarters": "Dubai, UAE",
+    "region": "Middle East",
+    "coordinates": [55.2708, 25.2048],
+    "sector": "Family Office",
+    "annualRevenueUsd": 3100000000
+  },
+  {
+    "id": "client-polaris",
+    "name": "Polaris Agro Holdings",
+    "segment": "Strategic Corporate",
+    "headquarters": "Sao Paulo, Brazil",
+    "region": "Latin America",
+    "coordinates": [-46.6333, -23.5505],
+    "sector": "Agribusiness",
+    "annualRevenueUsd": 7400000000
+  }
+]
