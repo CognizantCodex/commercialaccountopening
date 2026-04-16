@@ -7,6 +7,7 @@ import { RadialCompletenessChart } from '@/components/charts/RadialCompletenessC
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CheckKycPanel } from '@/features/cases/CheckKycPanel';
 import { usePlatformStore } from '@/store';
 import { getSelectedCase, getCaseTimeline } from '@/services/selectors';
 
@@ -248,6 +249,10 @@ export function CasesView() {
               </div>
             </div>
           </Card>
+        </section>
+
+        <section>
+          <CheckKycPanel />
         </section>
       </div>
     </div>

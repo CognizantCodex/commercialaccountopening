@@ -208,4 +208,11 @@ public final class PlatformModels {
       DecisionLog decision
   ) {
   }
+
+  public record CheckKycResponse(
+      String status,
+      String message,
+      OffsetDateTime checkedAt
+  ) {
+  }
 }

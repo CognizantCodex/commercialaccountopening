@@ -255,3 +255,99 @@ export interface CaseTimelineEntry {
   status: 'pending' | 'active' | 'done' | 'issue';
   detail: string;
 }
+
+export interface CheckKycRequest {
+  brandName: string;
+  formTitle: string;
+  companyInfo: CheckKycCompanyInfo;
+  primaryContact: CheckKycPrimaryContact;
+  addresses: CheckKycAddresses;
+  bankingProfile: CheckKycBankingProfile;
+  beneficialOwners: CheckKycBeneficialOwner[];
+  documents: CheckKycDocuments;
+  declarations: CheckKycDeclarations;
+  additionalNotes: string;
+}
+
+export interface CheckKycCompanyInfo {
+  legalName: string;
+  tradingName: string;
+  entityType: string;
+  registrationNumber: string;
+  taxId: string;
+  incorporationDate: string;
+  incorporationState: string;
+  incorporationCountry: string;
+  industry: string;
+  website: string;
+  annualRevenue: string;
+  employeeCount: string;
+}
+
+export interface CheckKycPrimaryContact {
+  fullName: string;
+  title: string;
+  email: string;
+  phone: string;
+  extension: string;
+}
+
+export interface CheckKycAddresses {
+  registeredLine1: string;
+  registeredLine2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  operatingSameAsRegistered: boolean;
+  operatingLine1: string;
+  operatingLine2: string;
+  operatingCity: string;
+  operatingState: string;
+  operatingPostalCode: string;
+  operatingCountry: string;
+}
+
+export interface CheckKycBankingProfile {
+  accountPurpose: string;
+  requestedProducts: string[];
+  expectedOpeningDeposit: string;
+  monthlyIncoming: string;
+  monthlyOutgoing: string;
+  onlineBankingUsers: string;
+  internationalActivity: boolean;
+  jurisdictionsInScope: string;
+  needsCommercialCards: boolean;
+}
+
+export interface CheckKycBeneficialOwner {
+  id: string;
+  fullName: string;
+  title: string;
+  ownershipPercentage: string;
+  email: string;
+  phone: string;
+  isAuthorizedSigner: boolean;
+}
+
+export interface CheckKycDocuments {
+  certificateOfFormation: boolean;
+  taxIdLetter: boolean;
+  ownershipChart: boolean;
+  boardResolution: boolean;
+  signerIdentification: boolean;
+  addressProof: boolean;
+}
+
+export interface CheckKycDeclarations {
+  certifyAuthority: boolean;
+  certifyBeneficialOwners: boolean;
+  confirmTaxCompliance: boolean;
+  confirmTerms: boolean;
+}
+
+export interface CheckKycResponse {
+  status: 'pass' | 'fail';
+  message: string;
+  checkedAt: string;
+}

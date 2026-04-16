@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -128,6 +129,16 @@ public class PlatformService {
   @Transactional(readOnly = true)
   public List<PlatformModels.CaseRecord> listCases() {
     return caseRepository.findAllByOrderByCaseNameAsc().stream().map(this::toCaseRecord).toList();
+  }
+
+  @Transactional(readOnly = true)
+  public PlatformModels.CheckKycResponse checkKyc(PlatformRequests.CheckKycRequest request) {
+    boolean passed = ThreadLocalRandom.current().nextBoolean();
+    String status = passed ? "pass" : "fail";
+    String message = passed
+        ? "KYC screening passed for " + request.companyInfo().legalName() + "."
+        : "KYC screening failed for " + request.companyInfo().legalName() + ".";
+    return new PlatformModels.CheckKycResponse(status, message, OffsetDateTime.now());
   }
 
   @Transactional(readOnly = true)

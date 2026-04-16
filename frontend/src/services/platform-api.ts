@@ -2,7 +2,7 @@ import { createApiClient } from '@/lib/api-client';
 import { adaptPlatformSnapshot, type PlatformSnapshotDto } from '@/services/platform-adapter';
 import type { ScenarioState } from '@/mock-data/adapters';
 import type { CaseWorkflowAction } from '@/store/types';
-import type { DataSourceMode } from '@/types/platform';
+import type { CheckKycRequest, CheckKycResponse, DataSourceMode } from '@/types/platform';
 
 const dataSourceStorageKey = 'kyc-data-source';
 
@@ -11,6 +11,7 @@ interface PlatformEndpointConfig {
   resolveCasePath: string;
   monitoringPath: string;
   governancePath: string;
+  checkKycPath: string;
 }
 
 function isDataSourceMode(value: string | null): value is DataSourceMode {
@@ -26,6 +27,7 @@ function buildEndpointConfig(): PlatformEndpointConfig {
     governancePath:
       import.meta.env.VITE_PLATFORM_CASE_GOVERNANCE_PATH ??
       '/api/governance/cases/{caseId}/decision',
+    checkKycPath: import.meta.env.VITE_PLATFORM_CHECK_KYC_PATH ?? '/api/checkKYC',
   };
 }
 
@@ -83,6 +85,9 @@ export function createPlatformApi() {
         action,
         caseId,
       });
+    },
+    async checkKyc(request: CheckKycRequest): Promise<CheckKycResponse> {
+      return client.post<CheckKycResponse>(config.checkKycPath, request);
     },
   };
 }

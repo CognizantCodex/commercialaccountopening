@@ -54,4 +54,102 @@ public final class PlatformRequests {
       @NotEmpty List<String> reasoningChain
   ) {
   }
+
+  public record CheckKycRequest(
+      @NotBlank String brandName,
+      @NotBlank String formTitle,
+      @NotNull CompanyInfo companyInfo,
+      @NotNull PrimaryContact primaryContact,
+      @NotNull Addresses addresses,
+      @NotNull BankingProfile bankingProfile,
+      @NotEmpty List<BeneficialOwner> beneficialOwners,
+      @NotNull Documents documents,
+      @NotNull Declarations declarations,
+      String additionalNotes
+  ) {
+  }
+
+  public record CompanyInfo(
+      @NotBlank String legalName,
+      String tradingName,
+      @NotBlank String entityType,
+      @NotBlank String registrationNumber,
+      @NotBlank String taxId,
+      @NotBlank String incorporationDate,
+      @NotBlank String incorporationState,
+      @NotBlank String incorporationCountry,
+      @NotBlank String industry,
+      @NotBlank String website,
+      @NotBlank String annualRevenue,
+      @NotBlank String employeeCount
+  ) {
+  }
+
+  public record PrimaryContact(
+      @NotBlank String fullName,
+      @NotBlank String title,
+      @NotBlank String email,
+      @NotBlank String phone,
+      String extension
+  ) {
+  }
+
+  public record Addresses(
+      @NotBlank String registeredLine1,
+      String registeredLine2,
+      @NotBlank String city,
+      @NotBlank String state,
+      @NotBlank String postalCode,
+      @NotBlank String country,
+      boolean operatingSameAsRegistered,
+      String operatingLine1,
+      String operatingLine2,
+      String operatingCity,
+      String operatingState,
+      String operatingPostalCode,
+      @NotBlank String operatingCountry
+  ) {
+  }
+
+  public record BankingProfile(
+      @NotBlank String accountPurpose,
+      @NotEmpty List<String> requestedProducts,
+      @NotBlank String expectedOpeningDeposit,
+      @NotBlank String monthlyIncoming,
+      @NotBlank String monthlyOutgoing,
+      @NotBlank String onlineBankingUsers,
+      boolean internationalActivity,
+      String jurisdictionsInScope,
+      boolean needsCommercialCards
+  ) {
+  }
+
+  public record BeneficialOwner(
+      @NotBlank String id,
+      @NotBlank String fullName,
+      @NotBlank String title,
+      @NotBlank String ownershipPercentage,
+      @NotBlank String email,
+      @NotBlank String phone,
+      boolean isAuthorizedSigner
+  ) {
+  }
+
+  public record Documents(
+      boolean certificateOfFormation,
+      boolean taxIdLetter,
+      boolean ownershipChart,
+      boolean boardResolution,
+      boolean signerIdentification,
+      boolean addressProof
+  ) {
+  }
+
+  public record Declarations(
+      boolean certifyAuthority,
+      boolean certifyBeneficialOwners,
+      boolean confirmTaxCompliance,
+      boolean confirmTerms
+  ) {
+  }
 }
