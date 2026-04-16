@@ -50,6 +50,27 @@ export function CommandPalette() {
     }
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = documentElement.style.overflow;
+    const previousBodyTouchAction = body.style.touchAction;
+
+    body.style.overflow = 'hidden';
+    body.style.touchAction = 'none';
+    documentElement.style.overflow = 'hidden';
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.touchAction = previousBodyTouchAction;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -59,9 +80,12 @@ export function CommandPalette() {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--overlay)] px-4 py-16 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--overlay)] px-4 py-16 backdrop-blur-sm"
+      onClick={() => setOpen(false)}
+    >
       <div className="w-full max-w-2xl">
-        <Card className="p-3">
+        <Card className="p-3" onClick={(event) => event.stopPropagation()}>
           <label className="flex items-center gap-3 rounded-[1.25rem] border border-[var(--border)] px-4 py-3">
             <Search className="h-4 w-4 text-[var(--muted-foreground)]" />
             <input
