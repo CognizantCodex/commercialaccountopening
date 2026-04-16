@@ -23,6 +23,7 @@ function getDefaultAgentId(agentIds: Array<{ id: string; status: 'active' | 'idl
 
 export function AgentsView() {
   const navigate = useNavigate();
+  const dataSource = usePlatformStore((state) => state.dataSource);
   const agents = usePlatformStore((state) => state.agents);
   const activityFeed = usePlatformStore((state) => state.activityFeed);
   const confidenceMatrix = usePlatformStore((state) => state.confidenceMatrix);
@@ -194,10 +195,12 @@ export function AgentsView() {
             <div className="mt-4 flex flex-wrap gap-3">
               <Button
                 onClick={() => selectedAgentDemo.event && applyTimelineEvent(selectedAgentDemo.event)}
-                disabled={!selectedAgentDemo.canRunSample}
+                disabled={!selectedAgentDemo.canRunSample || dataSource === 'live'}
               >
                 <Sparkles className="h-4 w-4" />
-                {selectedAgentDemo.canRunSample
+                {dataSource === 'live'
+                  ? 'Switch to demo for sample'
+                  : selectedAgentDemo.canRunSample
                   ? selectedAgentDemo.blueprint.sampleActionLabel
                   : 'Sample already applied'}
               </Button>

@@ -7,6 +7,7 @@ import { RadialCompletenessChart } from '@/components/charts/RadialCompletenessC
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { CheckKycPanel } from '@/features/cases/CheckKycPanel';
 import { usePlatformStore } from '@/store';
 import { getSelectedCase, getCaseTimeline } from '@/services/selectors';
 
@@ -19,7 +20,9 @@ export function CasesView() {
   const currentStep = usePlatformStore((state) => state.currentStep);
   const selectedCaseId = usePlatformStore((state) => state.selectedCaseId);
   const selectCase = usePlatformStore((state) => state.selectCase);
-  const applyTimelineEvent = usePlatformStore((state) => state.applyTimelineEvent);
+  const dataSource = usePlatformStore((state) => state.dataSource);
+  const activeMutation = usePlatformStore((state) => state.activeMutation);
+  const runCaseWorkflowAction = usePlatformStore((state) => state.runCaseWorkflowAction);
   const selectedCase = usePlatformStore(getSelectedCase);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<(typeof statusFilters)[number]>('all');
@@ -44,6 +47,7 @@ export function CasesView() {
   const resolutionEvent = timeline.find((event) => event.type === 'advisor_resolved');
   const monitoringEvent = timeline.find((event) => event.type === 'monitoring_alert');
   const governanceEvent = timeline.find((event) => event.type === 'governance_logged');
+  const pendingAction = activeMutation?.caseId === selectedCase?.id ? activeMutation.action : null;
 
   if (!selectedCase) {
     return null;
@@ -180,9 +184,16 @@ export function CasesView() {
                 <Button
                   className="mt-4"
                   variant="secondary"
-                  onClick={() => resolutionEvent && applyTimelineEvent(resolutionEvent)}
+                  disabled={pendingAction === 'resolve'}
+                  onClick={() => {
+                    if (dataSource === 'demo' && !resolutionEvent) {
+                      return;
+                    }
+
+                    void runCaseWorkflowAction('resolve', selectedCase.id).catch(() => undefined);
+                  }}
                 >
-                  Apply resolution
+                  {pendingAction === 'resolve' ? 'Applying…' : 'Apply resolution'}
                 </Button>
               </div>
               <div className="rounded-[1.35rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
@@ -196,9 +207,18 @@ export function CasesView() {
                 <Button
                   className="mt-4"
                   variant="secondary"
-                  onClick={() => monitoringEvent && applyTimelineEvent(monitoringEvent)}
+                  disabled={pendingAction === 'start-monitoring'}
+                  onClick={() => {
+                    if (dataSource === 'demo' && !monitoringEvent) {
+                      return;
+                    }
+
+                    void runCaseWorkflowAction('start-monitoring', selectedCase.id).catch(
+                      () => undefined,
+                    );
+                  }}
                 >
-                  Start monitoring
+                  {pendingAction === 'start-monitoring' ? 'Starting…' : 'Start monitoring'}
                 </Button>
               </div>
               <div className="rounded-[1.35rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
@@ -212,17 +232,27 @@ export function CasesView() {
                 <Button
                   className="mt-4"
                   onClick={() => {
-                    if (governanceEvent) {
-                      applyTimelineEvent(governanceEvent);
+                    if (dataSource === 'demo' && !governanceEvent) {
+                      return;
                     }
-                    void navigate('/governance');
+
+                    void runCaseWorkflowAction('open-governance', selectedCase.id)
+                      .then(() => {
+                        void navigate('/governance');
+                      })
+                      .catch(() => undefined);
                   }}
+                  disabled={pendingAction === 'open-governance'}
                 >
-                  Open governance
+                  {pendingAction === 'open-governance' ? 'Opening…' : 'Open governance'}
                 </Button>
               </div>
             </div>
           </Card>
+        </section>
+
+        <section>
+          <CheckKycPanel />
         </section>
       </div>
     </div>

@@ -1,0 +1,739 @@
+openapi: 3.0.3
+info:
+  title: Aurora Commercial Account Opening API
+  version: 1.0.0
+  description: >
+    Implementation-oriented REST contract for the KYC North Star Intelligence Platform.
+    The v1 scope covers the Aurora Atlas Capital onboarding story from document intake
+    through QC remediation, continuous monitoring, and governance logging.
+  contact:
+    name: Aurora Platform Team
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+tags:
+  - name: Dashboard
+  - name: Cases
+  - name: Documents
+  - name: QC
+  - name: Monitoring
+  - name: Governance
+security:
+  - bearerAuth: []
+paths:
+  /dashboard/executive-summary:
+    get:
+      tags: [Dashboard]
+      summary: Get executive KPI summary
+      operationId: getExecutiveSummary
+      responses:
+        "200":
+          description: Executive summary for KPI cards, trend charts, and regional overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutiveSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /cases:
+    get:
+      tags: [Cases]
+      summary: List onboarding and monitoring cases
+      operationId: listCases
+      parameters:
+        - $ref: "#/components/parameters/stage"
+        - $ref: "#/components/parameters/status"
+        - $ref: "#/components/parameters/priority"
+        - $ref: "#/components/parameters/region"
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/size"
+      responses:
+        "200":
+          description: Paginated case summaries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedCaseSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /cases/{caseId}:
+    get:
+      tags: [Cases]
+      summary: Get a single case with onboarding detail
+      operationId: getCase
+      parameters:
+        - $ref: "#/components/parameters/caseId"
+      responses:
+        "200":
+          description: Full case detail including documents, QC rules, ownership graph, and timeline.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CaseDetail"
+              examples:
+                aurora:
+                  summary: Aurora reference case
+                  value:
+                    id: case-aurora-001
+                    clientId: client-aurora
+                    caseName: Aurora Atlas Capital Prime Brokerage Expansion
+                    stage: intake
+                    status: in-flight
+                    priority: high
+                    riskScore: 64
+                    completeness: 62
+                    nextBestAction: Validate the beneficial owner chain and resolve the registered address mismatch.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cases/{caseId}/documents:
+    post:
+      tags: [Documents]
+      summary: Register a newly uploaded onboarding document
+      operationId: createCaseDocument
+      parameters:
+        - $ref: "#/components/parameters/caseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+            examples:
+              auroraUbo:
+                summary: Updated Aurora UBO register
+                value:
+                  documentType: Updated UBO Register
+                  sourceSystem: advisor-portal
+                  uploadedBy: ava.lewis
+                  extractedFields:
+                    - shareholder-name
+                    - ownership
+                    - control-rights
+      responses:
+        "201":
+          description: Document accepted for storage and downstream processing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentSubmissionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cases/{caseId}/qc-reviews/{ruleId}/resolve:
+    post:
+      tags: [QC]
+      summary: Resolve a failed or manually reviewed QC rule
+      operationId: resolveQcRule
+      parameters:
+        - $ref: "#/components/parameters/caseId"
+        - $ref: "#/components/parameters/ruleId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveQcRuleRequest"
+      responses:
+        "200":
+          description: QC resolution recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QcResolutionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cases/{caseId}/monitoring-alerts:
+    post:
+      tags: [Monitoring]
+      summary: Create a continuous monitoring alert for a case
+      operationId: createMonitoringAlert
+      parameters:
+        - $ref: "#/components/parameters/caseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMonitoringAlertRequest"
+      responses:
+        "201":
+          description: Monitoring alert recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitoringAlert"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cases/{caseId}/governance-decisions:
+    post:
+      tags: [Governance]
+      summary: Log an explainable governance decision
+      operationId: createGovernanceDecision
+      parameters:
+        - $ref: "#/components/parameters/caseId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGovernanceDecisionRequest"
+      responses:
+        "201":
+          description: Governance decision created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernanceDecision"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /cases/{caseId}/timeline:
+    get:
+      tags: [Cases]
+      summary: Get the chronological event timeline for a case
+      operationId: getCaseTimeline
+      parameters:
+        - $ref: "#/components/parameters/caseId"
+      responses:
+        "200":
+          description: Ordered lifecycle events for the case.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [caseId, events]
+                properties:
+                  caseId:
+                    type: string
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineEvent"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+components:
+  parameters:
+    caseId:
+      name: caseId
+      in: path
+      required: true
+      schema:
+        type: string
+    ruleId:
+      name: ruleId
+      in: path
+      required: true
+      schema:
+        type: string
+    stage:
+      name: stage
+      in: query
+      schema:
+        type: string
+        enum: [intake, quality-check, monitoring, governance]
+    status:
+      name: status
+      in: query
+      schema:
+        type: string
+    priority:
+      name: priority
+      in: query
+      schema:
+        type: string
+        enum: [low, medium, high]
+    region:
+      name: region
+      in: query
+      schema:
+        type: string
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    BadRequest:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    Unauthorized:
+      description: Authentication is required or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+    NotFound:
+      description: Requested resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetail"
+  schemas:
+    ExecutiveSummary:
+      type: object
+      required:
+        - generatedAt
+        - kpis
+        - trends
+        - regionalOverview
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        kpis:
+          type: array
+          items:
+            $ref: "#/components/schemas/KpiMetric"
+        trends:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+        regionalOverview:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegionalOverview"
+    KpiMetric:
+      type: object
+      required: [metric, value, unit, delta]
+      properties:
+        metric:
+          type: string
+          enum:
+            - firstTimeRightRate
+            - nigoCount
+            - stpRate
+            - casesInFlight
+            - averageOnboardingTimeHours
+        value:
+          type: number
+          format: double
+        unit:
+          type: string
+        delta:
+          type: number
+          format: double
+    TrendPoint:
+      type: object
+      required: [date, nigoCount, stpRate]
+      properties:
+        date:
+          type: string
+          format: date
+        nigoCount:
+          type: integer
+        stpRate:
+          type: number
+          format: double
+    RegionalOverview:
+      type: object
+      required: [region, stpRate, casesInFlight]
+      properties:
+        region:
+          type: string
+        stpRate:
+          type: number
+          format: double
+        casesInFlight:
+          type: integer
+    PagedCaseSummaryResponse:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/CaseSummary"
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+    CaseSummary:
+      type: object
+      required:
+        - id
+        - clientId
+        - caseName
+        - stage
+        - status
+        - priority
+        - region
+        - riskScore
+        - completeness
+        - nextBestAction
+      properties:
+        id:
+          type: string
+        clientId:
+          type: string
+        caseName:
+          type: string
+        stage:
+          type: string
+        status:
+          type: string
+        priority:
+          type: string
+        region:
+          type: string
+        riskScore:
+          type: integer
+        completeness:
+          type: integer
+        nextBestAction:
+          type: string
+    CaseDetail:
+      allOf:
+        - $ref: "#/components/schemas/CaseSummary"
+        - type: object
+          required:
+            - jurisdiction
+            - assignedTo
+            - narrative
+            - documents
+            - qcRules
+            - ownershipGraph
+            - timeline
+          properties:
+            jurisdiction:
+              type: string
+            assignedTo:
+              type: string
+            narrative:
+              type: string
+            stpEligible:
+              type: boolean
+            firstTimeRight:
+              type: boolean
+            onboardingHours:
+              type: number
+              format: double
+            documents:
+              type: array
+              items:
+                $ref: "#/components/schemas/Document"
+            qcRules:
+              type: array
+              items:
+                $ref: "#/components/schemas/QcRule"
+            ownershipGraph:
+              $ref: "#/components/schemas/OwnershipGraph"
+            timeline:
+              type: array
+              items:
+                $ref: "#/components/schemas/TimelineEvent"
+    Document:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - completeness
+        - uploadedAt
+        - extractedFields
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [pending, validated, flagged]
+        completeness:
+          type: integer
+        uploadedAt:
+          type: string
+          format: date-time
+        extractedFields:
+          type: array
+          items:
+            type: string
+    CreateDocumentRequest:
+      type: object
+      required: [documentType, sourceSystem, uploadedBy, extractedFields]
+      properties:
+        documentType:
+          type: string
+        sourceSystem:
+          type: string
+        uploadedBy:
+          type: string
+        extractedFields:
+          type: array
+          items:
+            type: string
+        documentReference:
+          type: string
+          description: Optional external object store or DMS reference.
+    DocumentSubmissionResult:
+      type: object
+      required: [documentId, caseId, status, submittedAt]
+      properties:
+        documentId:
+          type: string
+        caseId:
+          type: string
+        status:
+          type: string
+          enum: [accepted]
+        submittedAt:
+          type: string
+          format: date-time
+    QcRule:
+      type: object
+      required: [id, label, status, rationale]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+          enum: [passed, failed, manual-review]
+        rationale:
+          type: string
+    ResolveQcRuleRequest:
+      type: object
+      required: [resolvedBy, resolutionNote, evidenceReferences]
+      properties:
+        resolvedBy:
+          type: string
+        resolutionNote:
+          type: string
+        evidenceReferences:
+          type: array
+          items:
+            type: string
+        updatedRiskScore:
+          type: integer
+    QcResolutionResult:
+      type: object
+      required: [caseId, ruleId, status, resolvedAt, resolvedBy]
+      properties:
+        caseId:
+          type: string
+        ruleId:
+          type: string
+        status:
+          type: string
+          enum: [resolved]
+        resolvedAt:
+          type: string
+          format: date-time
+        resolvedBy:
+          type: string
+        updatedRiskScore:
+          type: integer
+    CreateMonitoringAlertRequest:
+      type: object
+      required:
+        - alertType
+        - severity
+        - city
+        - narrative
+        - falsePositiveRisk
+      properties:
+        alertType:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        city:
+          type: string
+        jurisdiction:
+          type: string
+        narrative:
+          type: string
+        falsePositiveRisk:
+          type: integer
+        sourceReference:
+          type: string
+    MonitoringAlert:
+      type: object
+      required: [id, caseId, severity, city, narrative, createdAt]
+      properties:
+        id:
+          type: string
+        caseId:
+          type: string
+        severity:
+          type: string
+        city:
+          type: string
+        jurisdiction:
+          type: string
+        narrative:
+          type: string
+        falsePositiveRisk:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+    CreateGovernanceDecisionRequest:
+      type: object
+      required:
+        - decision
+        - confidence
+        - reviewer
+        - reasoningSummary
+        - sourceAttribution
+      properties:
+        decision:
+          type: string
+          enum: [approved, flagged, overridden]
+        confidence:
+          type: integer
+        reviewer:
+          type: string
+        reasoningSummary:
+          type: string
+        sourceAttribution:
+          type: array
+          items:
+            type: string
+        overrideJustification:
+          type: string
+    GovernanceDecision:
+      type: object
+      required:
+        - id
+        - caseId
+        - decision
+        - confidence
+        - reviewer
+        - createdAt
+      properties:
+        id:
+          type: string
+        caseId:
+          type: string
+        decision:
+          type: string
+        confidence:
+          type: integer
+        reviewer:
+          type: string
+        reasoningSummary:
+          type: string
+        sourceAttribution:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+    TimelineEvent:
+      type: object
+      required:
+        - id
+        - type
+        - timestamp
+        - title
+        - description
+        - severity
+        - routeHint
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+          enum: [info, success, warning, critical]
+        routeHint:
+          type: string
+    OwnershipGraph:
+      type: object
+      required: [nodes, links]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnershipNode"
+        links:
+          type: array
+          items:
+            $ref: "#/components/schemas/OwnershipLink"
+    OwnershipNode:
+      type: object
+      required: [id, name, role, group]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        group:
+          type: string
+    OwnershipLink:
+      type: object
+      required: [source, target, weight]
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        weight:
+          type: integer
+    ProblemDetail:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

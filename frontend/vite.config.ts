@@ -13,6 +13,12 @@ export default defineConfig({
   },
   server: {
     port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     target: 'esnext',

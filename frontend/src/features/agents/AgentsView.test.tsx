@@ -11,6 +11,7 @@ describe('AgentsView', () => {
     usePlatformStore.setState({
       commandPaletteOpen: false,
       currentRoute: 'agents',
+      dataSource: 'demo',
       focusedCaseId: null,
       focusedRegion: null,
       themeMode: 'dark',

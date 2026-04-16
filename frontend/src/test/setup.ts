@@ -35,5 +35,6 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 afterEach(() => {
+  window.localStorage.clear();
   cleanup();
 });

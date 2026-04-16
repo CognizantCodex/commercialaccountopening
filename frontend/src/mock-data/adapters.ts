@@ -131,77 +131,117 @@ function findCase(cases: CaseRecord[], caseId: string) {
   return cases.find((record) => record.id === caseId);
 }
 
+function resolveTargetDocument(activeCase: CaseRecord, event: TimelineEvent) {
+  const documentId = typeof event.payload?.documentId === 'string' ? event.payload.documentId : null;
+  return (
+    activeCase.documents.find((document) => document.id === documentId) ??
+    activeCase.documents.find((document) => document.status !== 'validated') ??
+    activeCase.documents[0]
+  );
+}
+
+function resolveTargetRule(activeCase: CaseRecord, event: TimelineEvent) {
+  const ruleId = typeof event.payload?.ruleId === 'string' ? event.payload.ruleId : null;
+  return (
+    activeCase.qcRules.find((rule) => rule.id === ruleId) ??
+    activeCase.qcRules.find((rule) => rule.status === 'failed' || rule.status === 'manual-review') ??
+    activeCase.qcRules[0]
+  );
+}
+
 function applyEventToCases(cases: CaseRecord[], event: TimelineEvent) {
   const activeCase = findCase(cases, event.caseId);
   if (!activeCase) {
     return;
   }
 
+  const targetDocument = resolveTargetDocument(activeCase, event);
+  const targetRule = resolveTargetRule(activeCase, event);
+
   switch (event.type) {
     case 'document_uploaded': {
       activeCase.stage = 'classification';
-      activeCase.completeness = 74;
+      const completenessGain =
+        typeof event.payload?.completenessGain === 'number' ? event.payload.completenessGain : 12;
+      activeCase.completeness = Math.min(activeCase.completeness + completenessGain, 98);
       activeCase.documents = activeCase.documents.map((document) =>
-        document.id === 'doc-ubo'
+        document.id === targetDocument?.id
           ? {
               ...document,
               status: 'validated',
-              completeness: 96,
-              extractedFields: [...document.extractedFields, 'controller-chain'],
+              completeness: Math.max(document.completeness, 96),
+              extractedFields: Array.from(
+                new Set([
+                  ...document.extractedFields,
+                  typeof event.payload?.extractedField === 'string'
+                    ? event.payload.extractedField
+                    : 'controller-chain',
+                ]),
+              ),
             }
           : document,
       );
       activeCase.narrative =
-        'Fresh ownership evidence is in, giving the AI engine enough structure to classify the legal hierarchy.';
-      activeCase.nextBestAction = 'Wait for the entity-resolution agent to score the controller chain.';
+        'Fresh evidence has landed, giving the AI engine enough structure to refresh entity understanding and move the case forward.';
+      activeCase.nextBestAction =
+        'Wait for the entity-resolution agent to score the updated ownership and policy context.';
       return;
     }
     case 'agent_classified': {
       activeCase.stage = 'quality-check';
-      activeCase.completeness = 86;
-      activeCase.onboardingHours = 30.4;
-      activeCase.riskScore = 57;
+      activeCase.completeness = Math.min(activeCase.completeness + 10, 99);
+      activeCase.onboardingHours = Math.max(activeCase.onboardingHours - 2.4, 12);
+      activeCase.riskScore =
+        typeof event.payload?.riskScore === 'number'
+          ? event.payload.riskScore
+          : Math.max(activeCase.riskScore - 7, 24);
       activeCase.narrative =
-        'AI classification completed the ownership graph and narrowed the case to one address quality issue.';
-      activeCase.nextBestAction = 'Review the remaining QC issues before the case can exit exceptions.';
+        'AI classification refreshed the ownership graph and narrowed the case to a smaller set of policy-critical checks.';
+      activeCase.nextBestAction =
+        'Review the remaining QC issues before the case can fully exit exceptions.';
       return;
     }
     case 'qc_failed': {
       activeCase.stage = 'advisor-review';
       activeCase.status = 'exception';
       activeCase.qcRules = activeCase.qcRules.map((rule) =>
-        rule.id === 'rule-address'
+        rule.id === targetRule?.id
           ? {
               ...rule,
               status: 'failed',
               rationale:
-                'AI comparison found inconsistent registered addresses across the proof of address and tax certificate.',
+                typeof event.payload?.rationale === 'string'
+                  ? event.payload.rationale
+                  : 'AI comparison found inconsistent evidence that still needs human remediation.',
             }
           : rule,
       );
       activeCase.narrative =
         'The platform has isolated a single exception, preserving speed while creating a clear human handoff.';
-      activeCase.nextBestAction = 'Request a replacement address document from the relationship team.';
+      activeCase.nextBestAction = 'Request fresh evidence from the relationship team to clear the exception.';
       return;
     }
     case 'advisor_resolved': {
       activeCase.stage = 'monitoring';
       activeCase.status = 'resolved';
-      activeCase.completeness = 96;
-      activeCase.onboardingHours = 27.8;
-      activeCase.riskScore = 51;
+      activeCase.completeness = Math.max(activeCase.completeness, 96);
+      activeCase.onboardingHours = Math.max(activeCase.onboardingHours - 2.6, 11);
+      activeCase.riskScore =
+        typeof event.payload?.newRiskScore === 'number' ? event.payload.newRiskScore : 51;
       activeCase.qcRules = activeCase.qcRules.map((rule) =>
-        rule.id === 'rule-address'
+        rule.id === targetRule?.id
           ? {
               ...rule,
               status: 'passed',
               rationale:
-                'Advisor supplied a notarized address certificate and the exception was cleared.',
+                typeof event.payload?.resolutionRationale === 'string'
+                  ? event.payload.resolutionRationale
+                  : 'Advisor supplied fresh corroborating evidence and the exception was cleared.',
             }
           : rule,
       );
       activeCase.documents = activeCase.documents.map((document) =>
-        document.id === 'doc-proof'
+        document.id === targetDocument?.id
           ? { ...document, status: 'validated', completeness: 100 }
           : document,
       );
@@ -229,29 +269,31 @@ function applyEventToCases(cases: CaseRecord[], event: TimelineEvent) {
   }
 }
 
-function applyEventToAlerts(alerts: MonitoringAlert[], event: TimelineEvent): MonitoringAlert[] {
+function applyEventToAlerts(
+  alerts: MonitoringAlert[],
+  event: TimelineEvent,
+  clients: ClientRecord[],
+): MonitoringAlert[] {
   if (event.type !== 'monitoring_alert') {
     return alerts;
   }
 
-  const auroraAlert: MonitoringAlert = {
-    id: 'alert-aurora-001',
+  const client = clients.find((record) => record.id === event.clientId);
+
+  const alert: MonitoringAlert = {
+    id: `alert-${event.caseId}-${event.id}`,
     caseId: event.caseId,
     clientId: event.clientId,
     title: event.title,
-    severity: 'critical',
-    region: 'Europe',
-    coordinates: [-0.1276, 51.5072],
+    severity: event.severity,
+    region: client?.region ?? 'Monitoring',
+    coordinates: client?.coordinates ?? [0, 0],
     eventTime: event.timestamp,
     falsePositiveRisk: Number(event.payload?.falsePositiveRisk ?? 18),
-    description:
-      'New adverse media and subsidiary controller mention require escalation from monitoring into governance review.',
+    description: event.description,
   };
 
-  return [
-    auroraAlert,
-    ...alerts,
-  ];
+  return [alert, ...alerts];
 }
 
 function applyEventToDecisions(decisions: DecisionLog[], event: TimelineEvent): DecisionLog[] {
@@ -259,48 +301,51 @@ function applyEventToDecisions(decisions: DecisionLog[], event: TimelineEvent): 
     return decisions;
   }
 
-  const auroraDecision: DecisionLog = {
-    id: 'decision-aurora-001',
+  const decision: DecisionLog = {
+    id: `decision-${event.caseId}-${event.id}`,
     caseId: event.caseId,
-    title: 'Aurora explainability record created',
+    title: `${event.title.replace(/\.$/, '')} record created`,
     actor: 'Explainability Console',
-    decision: 'flagged',
+    decision:
+      event.payload?.decision === 'approved' ||
+      event.payload?.decision === 'escalated' ||
+      event.payload?.decision === 'overridden' ||
+      event.payload?.decision === 'flagged'
+        ? event.payload.decision
+        : 'flagged',
     confidence: Number(event.payload?.confidence ?? 78),
     createdAt: event.timestamp,
     reasoningChain: [
-      'Entity-resolution confidence recovered after the updated UBO register was processed.',
-      'A material address mismatch triggered manual review and human evidence collection.',
-      'Monitoring surfaced new adverse media, so the case remained flagged despite onboarding completion.',
+      'Entity-resolution confidence was recalculated after refreshed evidence entered the case.',
+      'Policy-critical controls and human review steps were captured in the reasoning chain.',
+      'The explainability pack preserves the final decision and linked evidence for audit readiness.',
     ],
     sources: [
       {
-        id: 'source-aurora-1',
-        label: 'Updated UBO register',
+        id: `source-${event.id}-1`,
+        label: typeof event.payload?.primarySourceLabel === 'string' ? event.payload.primarySourceLabel : 'Updated case evidence',
         type: 'document',
         confidence: 94,
-        excerpt: 'Latest shareholding record identified the final controller chain.',
+        excerpt: 'Latest document set refreshed the policy and ownership context for this case.',
       },
       {
-        id: 'source-aurora-2',
-        label: 'Adverse media screening',
+        id: `source-${event.id}-2`,
+        label: 'Monitoring and screening output',
         type: 'screening',
         confidence: 79,
-        excerpt: 'Adverse media article linked a disclosed subsidiary controller to an active inquiry.',
+        excerpt: 'Screening and monitoring signals were attached to the explainability record.',
       },
       {
-        id: 'source-aurora-3',
+        id: `source-${event.id}-3`,
         label: 'Advisor remediation note',
         type: 'advisor-note',
         confidence: 86,
-        excerpt: 'Address exception remediated with notarized replacement evidence.',
+        excerpt: 'Human review commentary and remediation evidence were preserved for audit.',
       },
     ],
   };
 
-  return [
-    auroraDecision,
-    ...decisions,
-  ];
+  return [decision, ...decisions];
 }
 
 function deriveKpis(cases: CaseRecord[], step: number): KpiMetric[] {
@@ -606,7 +651,7 @@ export function buildScenarioState(step: number): ScenarioState {
 
   for (const event of appliedEvents) {
     applyEventToCases(cases, event);
-    alerts = applyEventToAlerts(alerts, event);
+    alerts = applyEventToAlerts(alerts, event, clients);
     decisions = applyEventToDecisions(decisions, event);
   }
 

@@ -4,6 +4,7 @@ import { createAgentsSlice } from '@/store/agents';
 import { createAppSlice } from '@/store/app';
 import { createCasesSlice } from '@/store/cases';
 import { createGovernanceSlice } from '@/store/governance';
+import { createIntegrationSlice } from '@/store/integration';
 import { createMetricsSlice } from '@/store/metrics';
 import { createMonitoringSlice } from '@/store/monitoring';
 import { createSimulationSlice } from '@/store/simulation';
@@ -13,6 +14,7 @@ const initialScenario = buildScenarioState(0);
 
 export const usePlatformStore = create<PlatformStore>()((...args) => ({
   ...createAppSlice(...args),
+  ...createIntegrationSlice(...args),
   ...createMetricsSlice(initialScenario)(...args),
   ...createAgentsSlice(initialScenario)(...args),
   ...createCasesSlice(initialScenario)(...args),

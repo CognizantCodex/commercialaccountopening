@@ -1,0 +1,14 @@
+package com.kycnorthstar.platform.modules.cases;
+
+public enum CaseStage {
+  INTAKE,
+  EVIDENCE_COLLECTION,
+  CLASSIFICATION,
+  QC_EVALUATION,
+  STP_APPROVAL,
+  ADVISOR_EXCEPTION,
+  OPERATIONS_EXCEPTION,
+  ACTIVE_MONITORING,
+  GOVERNANCE_REVIEW,
+  CLOSED
+}

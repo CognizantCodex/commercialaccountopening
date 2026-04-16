@@ -9,8 +9,12 @@ server/data/corporate-account-opening.sqlite
 server/data/corporate-account-opening.sqlite-*
 templates/
 .kiro/
-.github/
+.github/*
+!.github/workflows/
+!.github/workflows/verify.yml
 .codex/
 .claude/
 .agents/
 AGENTS.md
+backend/target/
+backend/.m2/

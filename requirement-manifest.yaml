@@ -1,0 +1,160 @@
+project:
+  name: KYC North Star Intelligence Platform
+  description: >
+    Full-stack commercial account opening platform that demonstrates how Aurora Atlas
+    Capital moves from manual onboarding to AI-assisted, event-driven, explainable KYC.
+  type: full-stack
+metadata:
+  version: 1.0.0
+  generated: "2026-04-16T22:05:00Z"
+  sources:
+    - plan1.md
+    - frontend/src/mock-data/cases.json
+    - frontend/src/mock-data/clients.json
+    - frontend/src/mock-data/events-timeline.json
+techStack:
+  backend:
+    language: java
+    framework: spring-boot
+    version: "3.x"
+  frontend:
+    framework: react
+    version: "19"
+    language: typescript
+  database:
+    type: h2
+    version: latest
+  api:
+    style: rest
+    spec: openapi-3.x
+conditionalFlags:
+  frontendNeeded: true
+  aiMlScope: EXTENSIVE
+  eventStreaming:
+    detected: true
+    broker: kafka
+  devopsRequired: true
+requirements:
+  functional:
+    - id: FR-001
+      title: Case intake and work queue
+      description: >
+        The platform must expose a case queue for commercial onboarding requests with
+        lifecycle stage, risk, ownership, and next-best-action context.
+      userStory: >
+        As a KYC operations lead, I want to view and filter active onboarding cases,
+        so that I can prioritize high-risk work such as Aurora Atlas Capital.
+      acceptanceCriteria:
+        - GIVEN multiple onboarding cases WHEN an operator queries the case queue THEN the response includes stage, status, priority, risk score, completeness, and next-best action.
+        - GIVEN a specific case id WHEN the operator opens case detail THEN the response includes documents, QC rules, ownership graph nodes, and timeline events.
+      priority: HIGH
+    - id: FR-002
+      title: Document ingestion and AI extraction handoff
+      description: >
+        The platform must accept new onboarding documents and record extraction-relevant
+        metadata for downstream AI entity and document agents.
+      userStory: >
+        As a coverage advisor, I want to upload updated KYC evidence, so that AI agents
+        can re-evaluate entity structure and document completeness.
+      acceptanceCriteria:
+        - GIVEN an active case WHEN a new document is submitted THEN the API stores document type, source, uploaded timestamp, and extracted field targets.
+        - GIVEN a successful document submission WHEN the platform emits its integration event THEN downstream consumers receive case, client, and document identifiers plus correlation metadata.
+      priority: HIGH
+    - id: FR-003
+      title: QC rule failure and exception resolution
+      description: >
+        The system must track automated QC outcomes and support explicit human resolution
+        of failed controls such as the Aurora address mismatch.
+      userStory: >
+        As a KYC analyst, I want to review failed QC rules and record resolution evidence,
+        so that I can move eligible cases back toward straight-through processing.
+      acceptanceCriteria:
+        - GIVEN a failed QC rule WHEN the case detail is retrieved THEN the response includes rule status, rationale, and required remediation.
+        - GIVEN a manual resolution WHEN the operator submits reviewer evidence THEN the system records reviewer identity, resolution note, and updated risk score.
+      priority: HIGH
+    - id: FR-004
+      title: Beneficial ownership explainability
+      description: >
+        The platform must return an ownership graph that links clients, parent entities,
+        UBOs, advisors, and registry sources for explainable KYC decisions.
+      userStory: >
+        As a compliance reviewer, I want to inspect beneficial ownership relationships,
+        so that I can understand why a case is blocked or cleared.
+      acceptanceCriteria:
+        - GIVEN a case with ownership complexity WHEN case detail is requested THEN graph nodes and weighted edges are returned in a frontend-consumable structure.
+        - GIVEN an updated ownership document WHEN entity classification completes THEN the ownership graph can reflect the latest controller hierarchy.
+      priority: HIGH
+    - id: FR-005
+      title: Continuous monitoring alert ingestion
+      description: >
+        The platform must accept post-onboarding monitoring alerts tied to clients,
+        cities, jurisdictions, and false-positive risk indicators.
+      userStory: >
+        As a monitoring analyst, I want to log adverse media or screening alerts,
+        so that onboarding and continuous KYC remain connected.
+      acceptanceCriteria:
+        - GIVEN a monitoring event WHEN the alert endpoint is called THEN the system stores severity, location, narrative, and false-positive risk.
+        - GIVEN a monitoring alert is accepted WHEN subscribers consume the event THEN they receive case and client references compatible with case and governance views.
+      priority: HIGH
+    - id: FR-006
+      title: Governance decision logging
+      description: >
+        The platform must persist explainable governance records containing reasoning
+        chain summaries, reviewer outcomes, source attribution, and confidence.
+      userStory: >
+        As a model risk or audit reviewer, I want each AI-assisted outcome to have an
+        explainability record, so that I can defend the decision during audit.
+      acceptanceCriteria:
+        - GIVEN a governance submission WHEN the decision is recorded THEN the platform stores decision outcome, confidence, reviewer, and evidence summary.
+        - GIVEN a governance record is created WHEN the event is published THEN audit and analytics consumers receive a durable event with correlation id and decision timestamp.
+      priority: HIGH
+    - id: FR-007
+      title: Executive KPI summary
+      description: >
+        The backend contract must expose a single summary response for KPI cards and
+        trends such as first-time-right rate, NIGO count, STP rate, and onboarding time.
+      userStory: >
+        As an executive sponsor, I want a concise operational summary, so that I can
+        quickly see whether Aurora-like onboarding is improving.
+      acceptanceCriteria:
+        - GIVEN dashboard clients request the summary WHEN the endpoint responds THEN it includes current KPIs, delta values, and trend samples.
+        - GIVEN the Aurora case remains exception-prone WHEN the summary is computed THEN its data influences exception and cycle-time metrics.
+      priority: MEDIUM
+    - id: FR-008
+      title: Storyline timeline retrieval
+      description: >
+        The platform must provide a case timeline that preserves the seeded Aurora
+        narrative across document upload, agent classification, QC failure, remediation,
+        monitoring, and governance.
+      userStory: >
+        As a demo operator, I want to replay the case lifecycle in order, so that the
+        platform tells a coherent transformation story.
+      acceptanceCriteria:
+        - GIVEN a case timeline request WHEN the API responds THEN events are returned in chronological order with route hints and severity.
+        - GIVEN the Aurora reference case WHEN the timeline is retrieved THEN it contains the six seeded steps used by the demo flow.
+      priority: MEDIUM
+  nonFunctional:
+    - id: NFR-001
+      category: performance
+      requirement: Case list, case detail, and executive summary endpoints should respond within 500 ms for demo-scale datasets.
+      priority: HIGH
+    - id: NFR-002
+      category: security
+      requirement: All synchronous endpoints and event producers must propagate authenticated user identity, correlation id, and audit timestamps.
+      priority: HIGH
+    - id: NFR-003
+      category: reliability
+      requirement: Governance and monitoring events must be published durably and be replayable for audit reconstruction.
+      priority: HIGH
+    - id: NFR-004
+      category: usability
+      requirement: API payloads must expose concise narrative, rationale, and next-best-action fields so UI teams can render clear operational guidance without extra joins.
+      priority: MEDIUM
+    - id: NFR-005
+      category: scalability
+      requirement: Contracts must support pagination and filtering for case queues and decision logs to accommodate growing onboarding volumes.
+      priority: MEDIUM
+complexity:
+  overall: HIGH
+  estimatedComponents: 15
+  estimatedEndpoints: 8

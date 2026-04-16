@@ -5,6 +5,7 @@ import type {
   CaseRecord,
   ClientRecord,
   ConfidenceCell,
+  DataSourceMode,
   DashboardRoute,
   DecisionLog,
   DemoMode,
@@ -32,6 +33,27 @@ export interface AppSlice {
   setCommandPaletteOpen: (open: boolean) => void;
   setTheme: (theme: ThemeMode) => void;
   cycleTheme: () => void;
+}
+
+export type PlatformLoadState = 'idle' | 'loading' | 'ready' | 'error';
+
+export type CaseWorkflowAction = 'resolve' | 'start-monitoring' | 'open-governance';
+
+export interface IntegrationSlice {
+  dataSource: DataSourceMode;
+  hydrationStatus: PlatformLoadState;
+  loadError: string | null;
+  lastSyncAt: string | null;
+  activeMutation:
+    | {
+        action: CaseWorkflowAction;
+        caseId: string;
+      }
+    | null;
+  initializePlatform: () => Promise<void>;
+  refreshPlatform: () => Promise<void>;
+  setDataSource: (mode: DataSourceMode) => void;
+  runCaseWorkflowAction: (action: CaseWorkflowAction, caseId: string) => Promise<void>;
 }
 
 export interface MetricsSlice {
@@ -83,6 +105,7 @@ export interface SimulationSlice {
 }
 
 export type PlatformStore = AppSlice &
+  IntegrationSlice &
   MetricsSlice &
   AgentsSlice &
   CasesSlice &

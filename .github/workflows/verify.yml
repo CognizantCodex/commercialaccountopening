@@ -1,0 +1,80 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.detect.outputs.frontend }}
+      backend: ${{ steps.detect.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        name: Detect project surfaces
+        shell: bash
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -f backend/pom.xml ] || [ -f backend/mvnw ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend-verify:
+    needs: discover
+    if: needs.discover.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm run test:run
+      - name: Production build
+        run: npm run build
+
+  backend-verify:
+    needs: discover
+    if: needs.discover.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Verify backend
+        shell: bash
+        run: |
+          if [ -f mvnw ]; then
+            chmod +x mvnw
+            ./mvnw verify
+          else
+            mvn verify
+          fi
