@@ -24,7 +24,7 @@ export function DecisionBrief({ route }: { route: DashboardRoute }) {
           <h3 className="text-lg font-semibold text-[var(--foreground)]">Why does it matter?</h3>
           <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">{brief.why}</p>
         </div>
-        <div className="rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(0,201,177,0.08)] p-4">
+        <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-accent-soft)] p-4">
           <h3 className="text-lg font-semibold text-[var(--foreground)]">What should I do?</h3>
           <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">{brief.action}</p>
           <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">

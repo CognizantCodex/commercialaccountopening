@@ -19,7 +19,7 @@ export function DemoControlBar() {
 
   return (
     <div className="border-b border-[var(--border)] px-4 py-3 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-3 rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] px-4 py-3 shadow-[var(--shadow-soft)] lg:flex-row lg:items-center lg:justify-between">
+      <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-3 rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 shadow-[var(--shadow-soft)] lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="default">Demo engine</Badge>
           <Button
@@ -43,14 +43,14 @@ export function DemoControlBar() {
           <div className="inline-flex rounded-full border border-[var(--border)] p-1">
             <button
               type="button"
-              className={`rounded-full px-3 py-1.5 text-sm ${mode === 'autoplay' ? 'bg-[color:rgba(0,201,177,0.16)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
+              className={`rounded-full px-3 py-1.5 text-sm ${mode === 'autoplay' ? 'bg-[var(--surface-accent)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
               onClick={() => setDemoMode('autoplay')}
             >
               Autoplay
             </button>
             <button
               type="button"
-              className={`rounded-full px-3 py-1.5 text-sm ${mode === 'interactive' ? 'bg-[color:rgba(31,111,235,0.16)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
+              className={`rounded-full px-3 py-1.5 text-sm ${mode === 'interactive' ? 'bg-[var(--surface-info)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
               onClick={() => setDemoMode('interactive')}
             >
               Interactive
@@ -61,7 +61,7 @@ export function DemoControlBar() {
               <button
                 key={speed}
                 type="button"
-                className={`rounded-full px-3 py-1.5 text-sm ${speedMultiplier === speed ? 'bg-[color:rgba(0,201,177,0.16)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
+                className={`rounded-full px-3 py-1.5 text-sm ${speedMultiplier === speed ? 'bg-[var(--surface-accent)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}
                 onClick={() => setSpeedMultiplier(speed)}
               >
                 {speed}x

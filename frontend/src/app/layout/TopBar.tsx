@@ -20,7 +20,7 @@ export function TopBar() {
     );
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[color:rgba(13,17,23,0.72)] backdrop-blur-xl">
+    <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--shell-topbar)] backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-[1700px] items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0">
           <div className="flex items-center gap-3">

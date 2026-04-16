@@ -64,7 +64,7 @@ export function GovernanceView() {
                 {decisionLogs.map((decision) => (
                   <tr
                     key={decision.id}
-                    className="cursor-pointer rounded-[1.25rem] bg-[color:rgba(255,255,255,0.03)]"
+                    className="cursor-pointer rounded-[1.25rem] bg-[var(--surface-muted)]"
                     onClick={() => selectCase(decision.caseId)}
                   >
                     <td className="rounded-l-[1.25rem] px-3 py-3 text-sm font-medium text-[var(--foreground)]">
@@ -106,7 +106,7 @@ export function GovernanceView() {
             Overrides stay visible and attributable, which keeps trust high while preserving human authority where it matters.
           </p>
           {selectedDecision.overrideReason && (
-            <div className="mt-4 rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-[var(--muted-foreground)]">
+            <div className="mt-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--muted-foreground)]">
               {selectedDecision.overrideReason}
             </div>
           )}
@@ -123,7 +123,7 @@ export function GovernanceView() {
             {selectedDecision.reasoningChain.map((reason, index) => (
               <div
                 key={reason}
-                className="rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4"
+                className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4"
               >
                 <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
                   Step {index + 1}
@@ -146,7 +146,7 @@ export function GovernanceView() {
             {selectedDecision.sources.map((source) => (
               <div
                 key={source.id}
-                className="rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4"
+                className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="font-medium text-[var(--foreground)]">{source.label}</div>
@@ -170,13 +170,13 @@ export function GovernanceView() {
           <div className="mt-4 h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={fairnessSeries}>
-                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
                 <XAxis dataKey="cohort" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{
-                    background: 'rgba(13,17,23,0.92)',
-                    borderColor: 'rgba(255,255,255,0.08)',
+                    background: 'var(--tooltip-bg)',
+                    borderColor: 'var(--tooltip-border)',
                     borderRadius: 16,
                   }}
                 />

@@ -62,7 +62,7 @@ export function CasesView() {
           <Filter className="h-4 w-4 text-[var(--muted-foreground)]" />
         </div>
         <input
-          className="mt-4 w-full rounded-[1.2rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] px-4 py-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)]"
+          className="mt-4 w-full rounded-[1.2rem] border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)]"
           placeholder="Search cases or jurisdictions"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -72,7 +72,7 @@ export function CasesView() {
             <button
               key={filter}
               type="button"
-              className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.16em] ${statusFilter === filter ? 'border-[color:rgba(0,201,177,0.45)] bg-[color:rgba(0,201,177,0.12)] text-[var(--foreground)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+              className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.16em] ${statusFilter === filter ? 'border-[color:rgba(0,201,177,0.45)] bg-[var(--surface-accent)] text-[var(--foreground)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
               onClick={() => setStatusFilter(filter)}
             >
               {filter}
@@ -84,7 +84,7 @@ export function CasesView() {
             <button
               key={record.id}
               type="button"
-              className={`w-full rounded-[1.35rem] border p-4 text-left transition-colors ${selectedCaseId === record.id ? 'border-[color:rgba(0,201,177,0.45)] bg-[linear-gradient(135deg,rgba(0,201,177,0.14),rgba(31,111,235,0.08))]' : 'border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] hover:bg-[color:rgba(255,255,255,0.05)]'}`}
+              className={`w-full rounded-[1.35rem] border p-4 text-left transition-colors ${selectedCaseId === record.id ? 'border-[color:rgba(0,201,177,0.45)] bg-[linear-gradient(135deg,rgba(0,201,177,0.14),rgba(31,111,235,0.08))]' : 'border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]'}`}
               onClick={() => selectCase(record.id)}
             >
               <div className="flex items-center justify-between gap-3">
@@ -123,7 +123,7 @@ export function CasesView() {
               {selectedCase.qcRules.map((rule) => (
                 <div
                   key={rule.id}
-                  className="rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4"
+                  className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-medium text-[var(--foreground)]">{rule.label}</div>
@@ -145,7 +145,7 @@ export function CasesView() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(0,201,177,0.08)] p-4">
+            <div className="mt-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-accent-soft)] p-4">
               <div className="inline-flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
                 <Sparkles className="h-4 w-4 text-[var(--accent)]" />
                 Recommended next action
@@ -169,7 +169,7 @@ export function CasesView() {
               Resolve or escalate from the same workspace
             </h3>
             <div className="mt-4 grid gap-4 xl:grid-cols-3">
-              <div className="rounded-[1.35rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1.35rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="inline-flex items-center gap-2 font-medium text-[var(--foreground)]">
                   <ShieldAlert className="h-4 w-4 text-[var(--warning)]" />
                   Clear current exception
@@ -185,7 +185,7 @@ export function CasesView() {
                   Apply resolution
                 </Button>
               </div>
-              <div className="rounded-[1.35rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1.35rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="inline-flex items-center gap-2 font-medium text-[var(--foreground)]">
                   <ArrowRight className="h-4 w-4 text-[var(--accent)]" />
                   Trigger monitoring
@@ -201,7 +201,7 @@ export function CasesView() {
                   Start monitoring
                 </Button>
               </div>
-              <div className="rounded-[1.35rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+              <div className="rounded-[1.35rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="inline-flex items-center gap-2 font-medium text-[var(--foreground)]">
                   <Sparkles className="h-4 w-4 text-[var(--accent-secondary)]" />
                   Open explainability pack

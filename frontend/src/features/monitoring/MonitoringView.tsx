@@ -74,13 +74,13 @@ export function MonitoringView() {
           <div className="mt-4 h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={riskHistogram}>
-                <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+                <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
                 <XAxis dataKey="bucket" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{
-                    background: 'rgba(13,17,23,0.92)',
-                    borderColor: 'rgba(255,255,255,0.08)',
+                    background: 'var(--tooltip-bg)',
+                    borderColor: 'var(--tooltip-border)',
                     borderRadius: 16,
                   }}
                 />
@@ -106,7 +106,7 @@ export function MonitoringView() {
               <button
                 key={alert.id}
                 type="button"
-                className="w-full rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4 text-left transition-colors hover:bg-[color:rgba(255,255,255,0.05)]"
+                className="w-full rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-left transition-colors hover:bg-[var(--surface-hover)]"
                 onClick={() => {
                   selectCase(alert.caseId);
                   void navigate('/cases');

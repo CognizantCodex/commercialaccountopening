@@ -15,14 +15,14 @@ export function DualAxisTrendChart({ data }: { data: TrendPoint[] }) {
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid stroke="rgba(255,255,255,0.08)" vertical={false} />
+          <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
           <XAxis dataKey="month" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
           <YAxis yAxisId="left" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
           <YAxis yAxisId="right" orientation="right" stroke="var(--muted-foreground)" tickLine={false} axisLine={false} />
           <Tooltip
             contentStyle={{
-              background: 'rgba(13,17,23,0.92)',
-              borderColor: 'rgba(255,255,255,0.08)',
+              background: 'var(--tooltip-bg)',
+              borderColor: 'var(--tooltip-border)',
               borderRadius: 16,
             }}
           />

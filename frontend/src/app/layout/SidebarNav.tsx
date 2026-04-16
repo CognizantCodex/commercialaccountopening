@@ -15,7 +15,7 @@ export function SidebarNav({ compact = false }: { compact?: boolean }) {
   return (
     <div className={cn('flex h-full flex-col gap-6 p-4', compact && 'p-0')}>
       {!compact && (
-        <div className="rounded-[1.75rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-5 shadow-[var(--shadow-card)]">
+        <div className="rounded-[1.75rem] border border-[var(--border)] bg-[var(--surface-muted)] p-5 shadow-[var(--shadow-card)]">
           <p className="text-xs uppercase tracking-[0.28em] text-[var(--muted-foreground)]">
             KYC North Star
           </p>
@@ -43,7 +43,7 @@ export function SidebarNav({ compact = false }: { compact?: boolean }) {
               className={({ isActive }) =>
                 cn(
                   'group rounded-[1.5rem] border px-4 py-4 transition-all duration-200',
-                  'border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] hover:-translate-y-0.5 hover:border-[color:rgba(0,201,177,0.35)]',
+                  'border-[var(--border)] bg-[var(--surface-muted)] hover:-translate-y-0.5 hover:border-[color:rgba(0,201,177,0.35)]',
                   isActive &&
                     'border-[color:rgba(0,201,177,0.45)] bg-[linear-gradient(135deg,rgba(0,201,177,0.18),rgba(31,111,235,0.12))] shadow-[var(--shadow-soft)]',
                 )
@@ -69,7 +69,7 @@ export function SidebarNav({ compact = false }: { compact?: boolean }) {
         })}
       </nav>
       {!compact && (
-        <div className="mt-auto rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4">
+        <div className="mt-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
           <p className="text-xs uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
             Demo posture
           </p>
