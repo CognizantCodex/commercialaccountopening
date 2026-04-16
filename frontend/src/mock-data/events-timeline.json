@@ -1,0 +1,97 @@
+[
+  {
+    "id": "evt-001",
+    "timeOffsetMs": 0,
+    "timestamp": "2026-04-16T09:00:00Z",
+    "type": "document_uploaded",
+    "title": "Additional UBO document uploaded",
+    "description": "The advisor uploads an updated beneficial owner register for Aurora Atlas Capital.",
+    "severity": "info",
+    "caseId": "case-aurora-001",
+    "clientId": "client-aurora",
+    "routeHint": "cases",
+    "payload": {
+      "documentType": "Updated UBO Register",
+      "completenessGain": 12
+    }
+  },
+  {
+    "id": "evt-002",
+    "timeOffsetMs": 1800,
+    "timestamp": "2026-04-16T09:00:02Z",
+    "type": "agent_classified",
+    "title": "AI entity agent classifies structure",
+    "description": "The AI agent resolves the entity structure and extracts the final controller hierarchy.",
+    "severity": "success",
+    "caseId": "case-aurora-001",
+    "clientId": "client-aurora",
+    "routeHint": "agents",
+    "payload": {
+      "confidence": 94,
+      "latencyMs": 412
+    }
+  },
+  {
+    "id": "evt-003",
+    "timeOffsetMs": 3600,
+    "timestamp": "2026-04-16T09:00:04Z",
+    "type": "qc_failed",
+    "title": "QC guard flags address mismatch",
+    "description": "The QC rules engine detects a mismatch between the operating address and the tax certificate.",
+    "severity": "warning",
+    "caseId": "case-aurora-001",
+    "clientId": "client-aurora",
+    "routeHint": "cases",
+    "payload": {
+      "failedRule": "Operating address corroborated across two documents"
+    }
+  },
+  {
+    "id": "evt-004",
+    "timeOffsetMs": 5400,
+    "timestamp": "2026-04-16T09:00:06Z",
+    "type": "advisor_resolved",
+    "title": "Advisor resolves exception with fresh evidence",
+    "description": "Relationship coverage attaches a new address verification source and clears the exception.",
+    "severity": "success",
+    "caseId": "case-aurora-001",
+    "clientId": "client-aurora",
+    "routeHint": "cases",
+    "payload": {
+      "newRiskScore": 51,
+      "owner": "Ava Lewis"
+    }
+  },
+  {
+    "id": "evt-005",
+    "timeOffsetMs": 7200,
+    "timestamp": "2026-04-16T09:00:08Z",
+    "type": "monitoring_alert",
+    "title": "Continuous KYC alert triggered in London",
+    "description": "Continuous monitoring detects adverse media tied to a newly disclosed subsidiary controller.",
+    "severity": "critical",
+    "caseId": "case-aurora-001",
+    "clientId": "client-aurora",
+    "routeHint": "monitoring",
+    "payload": {
+      "city": "London",
+      "falsePositiveRisk": 18
+    }
+  },
+  {
+    "id": "evt-006",
+    "timeOffsetMs": 9000,
+    "timestamp": "2026-04-16T09:00:10Z",
+    "type": "governance_logged",
+    "title": "Governance console logs explainable decision",
+    "description": "The system records the reasoning chain, evidence, and reviewer outcome for audit readiness.",
+    "severity": "info",
+    "caseId": "case-aurora-001",
+    "clientId": "client-aurora",
+    "routeHint": "governance",
+    "payload": {
+      "decision": "flagged",
+      "confidence": 78
+    }
+  }
+]

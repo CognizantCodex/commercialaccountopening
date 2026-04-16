@@ -7,3 +7,10 @@ backend/target
 server/data/workspace-store.json
 server/data/corporate-account-opening.sqlite
 server/data/corporate-account-opening.sqlite-*
+templates/
+.kiro/
+.github/
+.codex/
+.claude/
+.agents/
+AGENTS.md
