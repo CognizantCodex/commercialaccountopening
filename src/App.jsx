@@ -255,6 +255,52 @@ function mergeWorkspace(candidate = {}) {
   };
 }
 
+function mergeFailedKycResult(workspace, errorPayload = {}, fallbackMessage) {
+  const integration = errorPayload?.integration ?? {};
+  const message =
+    errorPayload?.issues?.[0]?.message ??
+    errorPayload?.error ??
+    fallbackMessage ??
+    "KYC Failed.";
+
+  return mergeWorkspace({
+    ...workspace,
+    submission: {
+      ...workspace.submission,
+      status: "error",
+      overallDecision: "kyc_failed",
+      summary: message,
+      recommendedAction:
+        "Review the KYC response, correct the application details if needed, and submit again.",
+    },
+    orchestration: {
+      ...workspace.orchestration,
+      status: "failed",
+      summary: "The onboarding orchestrator stopped after the KYC agent received a failed response.",
+      checks: {
+        ...workspace.orchestration.checks,
+        kyc: {
+          ...workspace.orchestration.checks.kyc,
+          status: "failed",
+          decision: "failed",
+          summary: message,
+          flags: [
+            ...(workspace.orchestration.checks.kyc.flags ?? []),
+            "CheckKYC returned a failed response for this application.",
+          ],
+          integration: {
+            checkKyc: integration.checkKyc ?? null,
+          },
+        },
+      },
+      integrations: {
+        ...workspace.orchestration.integrations,
+        checkKyc: integration.checkKyc ?? null,
+      },
+    },
+  });
+}
+
 function isFilled(value) {
   if (typeof value === "boolean") {
     return value;
@@ -712,6 +758,16 @@ function SummaryChip({ label, value, tone = "default" }) {
   );
 }
 
+function shouldShowCheckKycMessage(checkKyc) {
+  const message = String(checkKyc?.message ?? "").trim();
+
+  return (
+    Boolean(message) &&
+    message !==
+      "CheckKYC payload was prepared successfully. Configure CHECK_KYC_API_URL to forward it to an external application."
+  );
+}
+
 function ReviewCheckCard({ check }) {
   const checkKyc = check.integration?.checkKyc;
   const checkRisk = check.integration?.checkRisk;
@@ -748,9 +804,11 @@ function ReviewCheckCard({ check }) {
               {checkKyc.externalApplicationId ?? "Pending external response"}
             </strong>
           </p>
-          <p>Response: <strong>{checkKyc.response}</strong></p>
+          <p>
+            Response: <strong>{checkKyc.response ?? "Pending"}</strong>
+          </p>
           {checkKyc.errorMessage ? <p>{checkKyc.errorMessage}</p> : null}
-          <p>{checkKyc.message}</p>
+          {shouldShowCheckKycMessage(checkKyc) ? <p>{checkKyc.message}</p> : null}
         </div>
       ) : null}
       {checkRisk ? (
@@ -909,7 +967,6 @@ function OwnerCard({
           onChange={(event) => onFieldChange("fullName", event.target.value)}
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.fullName`)}
           error={getFieldError(`${ownerFieldPrefix}.fullName`)}
-          placeholder="Full legal name"
           autoComplete="name"
           required
         />
@@ -919,7 +976,6 @@ function OwnerCard({
           onChange={(event) => onFieldChange("title", event.target.value)}
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.title`)}
           error={getFieldError(`${ownerFieldPrefix}.title`)}
-          placeholder="Role or title"
           required
         />
         <TextField
@@ -933,7 +989,6 @@ function OwnerCard({
           }
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.ownershipPercentage`)}
           error={getFieldError(`${ownerFieldPrefix}.ownershipPercentage`)}
-          placeholder="25"
           inputMode="decimal"
           required
         />
@@ -944,7 +999,6 @@ function OwnerCard({
           onChange={(event) => onFieldChange("email", event.target.value)}
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.email`)}
           error={getFieldError(`${ownerFieldPrefix}.email`)}
-          placeholder="name@company.com"
           autoComplete="email"
         />
         <TextField
@@ -955,7 +1009,6 @@ function OwnerCard({
           }
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.phone`)}
           error={getFieldError(`${ownerFieldPrefix}.phone`)}
-          placeholder="4155550123"
           inputMode="numeric"
           maxLength={PHONE_DIGIT_LIMIT}
           autoComplete="tel"
@@ -1537,11 +1590,18 @@ function App() {
       if (error?.status !== 400) {
         setConnectionState("fallback");
       }
-      setStatusMessage(
+      const errorMessage =
         error?.payload?.issues?.[0]?.message ??
-          error?.message ??
-          "We couldn't submit the application right now. Please review the form and try again.",
-      );
+        error?.message ??
+        "We couldn't submit the application right now. Please review the form and try again.";
+
+      if (error?.payload?.integration?.checkKyc) {
+        setWorkspace((current) =>
+          mergeFailedKycResult(current, error.payload, errorMessage),
+        );
+      }
+
+      setStatusMessage(errorMessage);
     }
   }
 
@@ -1590,7 +1650,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("companyInfo.legalName")}
               error={getFieldError("companyInfo.legalName")}
-              placeholder="Acme Holdings Corporation"
               autoComplete="organization"
               required
             />
@@ -1600,7 +1659,6 @@ function App() {
               onChange={(event) =>
                 updateSection("companyInfo", "tradingName", event.target.value)
               }
-              placeholder="Acme Holdings"
             />
             <SelectField
               label="Entity type"
@@ -1619,7 +1677,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("companyInfo.registrationNumber")}
               error={getFieldError("companyInfo.registrationNumber")}
-              placeholder="State file / registration number"
               required
             />
             <TextField
@@ -1630,7 +1687,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("companyInfo.taxId")}
               error={getFieldError("companyInfo.taxId")}
-              placeholder="12-3456789"
               inputMode="numeric"
               maxLength={10}
               required
@@ -1655,7 +1711,6 @@ function App() {
               onBlur={() => handleFieldBlur("companyInfo.incorporationState")}
               error={getFieldError("companyInfo.incorporationState")}
               options={workspace.stateOptions}
-              placeholder="Select a state"
               required
             />
             <SelectField
@@ -1679,7 +1734,6 @@ function App() {
               onBlur={() => handleFieldBlur("companyInfo.industry")}
               error={getFieldError("companyInfo.industry")}
               options={workspace.industryOptions}
-              placeholder="Select an industry"
               required
             />
             <TextField
@@ -1690,7 +1744,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("companyInfo.website")}
               error={getFieldError("companyInfo.website")}
-              placeholder="https://www.company.com"
               type="url"
               autoComplete="url"
             />
@@ -1706,7 +1759,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("companyInfo.annualRevenue")}
               error={getFieldError("companyInfo.annualRevenue")}
-              placeholder="25000000"
               inputMode="numeric"
               maxLength={MONEY_DIGIT_LIMIT}
             />
@@ -1722,7 +1774,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("companyInfo.employeeCount")}
               error={getFieldError("companyInfo.employeeCount")}
-              placeholder="120"
               inputMode="numeric"
               maxLength={COUNT_DIGIT_LIMIT}
             />
@@ -1756,7 +1807,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("primaryContact.fullName")}
               error={getFieldError("primaryContact.fullName")}
-              placeholder="Jordan Lee"
               autoComplete="name"
               required
             />
@@ -1766,7 +1816,6 @@ function App() {
               onChange={(event) =>
                 updateSection("primaryContact", "title", event.target.value)
               }
-              placeholder="Chief Financial Officer"
             />
             <TextField
               label="Email"
@@ -1777,7 +1826,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("primaryContact.email")}
               error={getFieldError("primaryContact.email")}
-              placeholder="jordan.lee@company.com"
               autoComplete="email"
               required
             />
@@ -1793,7 +1841,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("primaryContact.phone")}
               error={getFieldError("primaryContact.phone")}
-              placeholder="4155550123"
               inputMode="numeric"
               maxLength={PHONE_DIGIT_LIMIT}
               autoComplete="tel"
@@ -1811,7 +1858,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("primaryContact.extension")}
               error={getFieldError("primaryContact.extension")}
-              placeholder="204"
               inputMode="numeric"
               maxLength={EXTENSION_DIGIT_LIMIT}
             />
@@ -1835,7 +1881,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("addresses.registeredLine1")}
               error={getFieldError("addresses.registeredLine1")}
-              placeholder="100 Market Street"
               autoComplete="address-line1"
               required
             />
@@ -1845,7 +1890,6 @@ function App() {
               onChange={(event) =>
                 updateSection("addresses", "registeredLine2", event.target.value)
               }
-              placeholder="Suite 1200"
             />
             <TextField
               label="City"
@@ -1855,7 +1899,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("addresses.city")}
               error={getFieldError("addresses.city")}
-              placeholder="San Francisco"
               autoComplete="address-level2"
               required
             />
@@ -1868,7 +1911,6 @@ function App() {
               onBlur={() => handleFieldBlur("addresses.state")}
               error={getFieldError("addresses.state")}
               options={workspace.stateOptions}
-              placeholder="Select a state"
               required
             />
             <TextField
@@ -1883,20 +1925,19 @@ function App() {
               }
               onBlur={() => handleFieldBlur("addresses.postalCode")}
               error={getFieldError("addresses.postalCode")}
-              placeholder="94105"
               inputMode="numeric"
               maxLength={POSTAL_CODE_DIGIT_LIMIT}
               autoComplete="postal-code"
               required
             />
-            <SelectField
-              label="Country"
-              value={workspace.addresses.country}
-              onChange={(event) =>
-                updateSection("addresses", "country", event.target.value)
-              }
-              options={workspace.countryOptions}
-            />
+              <SelectField
+                label="Country"
+                value={workspace.addresses.country}
+                onChange={(event) =>
+                  updateSection("addresses", "country", event.target.value)
+                }
+                options={workspace.countryOptions}
+              />
           </div>
 
           <label className="inline-toggle">
@@ -1924,7 +1965,6 @@ function App() {
                 }
                 onBlur={() => handleFieldBlur("addresses.operatingLine1")}
                 error={getFieldError("addresses.operatingLine1")}
-                placeholder="250 Industrial Drive"
                 autoComplete="address-line1"
                 required
               />
@@ -1934,7 +1974,6 @@ function App() {
                 onChange={(event) =>
                   updateSection("addresses", "operatingLine2", event.target.value)
                 }
-                placeholder="Floor 3"
               />
               <TextField
                 label="Operating city"
@@ -1944,7 +1983,6 @@ function App() {
                 }
                 onBlur={() => handleFieldBlur("addresses.operatingCity")}
                 error={getFieldError("addresses.operatingCity")}
-                placeholder="Oakland"
                 autoComplete="address-level2"
                 required
               />
@@ -1957,7 +1995,6 @@ function App() {
                 onBlur={() => handleFieldBlur("addresses.operatingState")}
                 error={getFieldError("addresses.operatingState")}
                 options={workspace.stateOptions}
-                placeholder="Select a state"
                 required
               />
               <TextField
@@ -1972,7 +2009,6 @@ function App() {
                 }
                 onBlur={() => handleFieldBlur("addresses.operatingPostalCode")}
                 error={getFieldError("addresses.operatingPostalCode")}
-                placeholder="94607"
                 inputMode="numeric"
                 maxLength={POSTAL_CODE_DIGIT_LIMIT}
                 autoComplete="postal-code"
@@ -2015,7 +2051,6 @@ function App() {
             }
             onBlur={() => handleFieldBlur("bankingProfile.accountPurpose")}
             error={getFieldError("bankingProfile.accountPurpose")}
-            placeholder="Describe expected receipts, disbursements, payroll, and treasury use."
             required
           />
 
@@ -2048,7 +2083,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("bankingProfile.expectedOpeningDeposit")}
               error={getFieldError("bankingProfile.expectedOpeningDeposit")}
-              placeholder="250000"
               inputMode="numeric"
               maxLength={MONEY_DIGIT_LIMIT}
               required
@@ -2065,7 +2099,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("bankingProfile.monthlyIncoming")}
               error={getFieldError("bankingProfile.monthlyIncoming")}
-              placeholder="900000"
               inputMode="numeric"
               maxLength={MONEY_DIGIT_LIMIT}
               required
@@ -2082,7 +2115,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("bankingProfile.monthlyOutgoing")}
               error={getFieldError("bankingProfile.monthlyOutgoing")}
-              placeholder="720000"
               inputMode="numeric"
               maxLength={MONEY_DIGIT_LIMIT}
               required
@@ -2099,7 +2131,6 @@ function App() {
               }
               onBlur={() => handleFieldBlur("bankingProfile.onlineBankingUsers")}
               error={getFieldError("bankingProfile.onlineBankingUsers")}
-              placeholder="2"
               inputMode="numeric"
               maxLength={COUNT_DIGIT_LIMIT}
             />
@@ -2113,7 +2144,6 @@ function App() {
                   event.target.value,
                 )
               }
-              placeholder="Canada, United Kingdom"
             />
           </div>
 
@@ -2254,7 +2284,6 @@ function App() {
             label="Additional notes"
             value={workspace.additionalNotes}
             onChange={(event) => updateTopLevel("additionalNotes", event.target.value)}
-            placeholder="Optional notes for the onboarding or treasury implementation team."
           />
         </section>
 
