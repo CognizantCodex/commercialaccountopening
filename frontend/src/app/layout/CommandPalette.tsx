@@ -59,7 +59,7 @@ export function CommandPalette() {
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[color:rgba(3,7,18,0.62)] px-4 py-16 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--overlay)] px-4 py-16 backdrop-blur-sm">
       <div className="w-full max-w-2xl">
         <Card className="p-3">
           <label className="flex items-center gap-3 rounded-[1.25rem] border border-[var(--border)] px-4 py-3">
@@ -77,7 +77,7 @@ export function CommandPalette() {
               <button
                 key={command.id}
                 type="button"
-                className="rounded-[1.25rem] border border-[var(--border)] px-4 py-3 text-left transition-colors hover:bg-[color:rgba(255,255,255,0.04)]"
+                className="rounded-[1.25rem] border border-[var(--border)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface-hover)]"
                 onClick={() => {
                   command.action();
                   setOpen(false);

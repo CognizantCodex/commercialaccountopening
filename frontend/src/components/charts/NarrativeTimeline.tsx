@@ -35,7 +35,7 @@ export function NarrativeTimeline({
               <div className={`mt-1 ${statusColor[entry.status]}`}>
                 <Icon className="h-4 w-4" />
               </div>
-              <div className="min-w-0 rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-3">
+              <div className="min-w-0 rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-medium text-[var(--foreground)]">{entry.label}</div>
                   <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">

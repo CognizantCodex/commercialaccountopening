@@ -28,7 +28,7 @@ export function ConfidenceWaterfall({ steps }: { steps: WaterfallStep[] }) {
               x2={width - margin.right}
               y1={y(tick)}
               y2={y(tick)}
-              stroke="rgba(255,255,255,0.08)"
+              stroke="var(--chart-grid)"
             />
             <text x={margin.left - 8} y={y(tick)} textAnchor="end" dy="0.35em" fill="var(--muted-foreground)" fontSize="11">
               {tick}

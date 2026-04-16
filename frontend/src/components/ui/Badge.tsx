@@ -4,11 +4,11 @@ import { cn } from '@/lib/utils';
 type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info';
 
 const badgeVariants: Record<BadgeVariant, string> = {
-  default: 'bg-[color:rgba(255,255,255,0.06)] text-[var(--foreground)]',
-  success: 'bg-[color:rgba(46,160,67,0.16)] text-[var(--success)]',
-  warning: 'bg-[color:rgba(242,204,96,0.16)] text-[var(--warning)]',
-  danger: 'bg-[color:rgba(248,81,73,0.16)] text-[var(--danger)]',
-  info: 'bg-[color:rgba(31,111,235,0.16)] text-[var(--accent-secondary)]',
+  default: 'bg-[var(--surface-muted)] text-[var(--foreground)]',
+  success: 'bg-[var(--surface-success)] text-[var(--success)]',
+  warning: 'bg-[var(--surface-warning)] text-[var(--warning)]',
+  danger: 'bg-[var(--surface-danger)] text-[var(--danger)]',
+  info: 'bg-[var(--surface-info)] text-[var(--accent-secondary)]',
 };
 
 export function Badge({

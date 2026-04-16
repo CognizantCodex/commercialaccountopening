@@ -19,9 +19,9 @@ export function formatRouteLabel(route: DashboardRoute) {
 
 export function getSeverityTone(severity: Severity) {
   return {
-    info: 'text-[var(--accent-secondary)] bg-[color:rgba(31,111,235,0.14)]',
-    success: 'text-[var(--success)] bg-[color:rgba(46,160,67,0.16)]',
-    warning: 'text-[var(--warning)] bg-[color:rgba(242,204,96,0.14)]',
-    critical: 'text-[var(--danger)] bg-[color:rgba(248,81,73,0.16)]',
+    info: 'text-[var(--accent-secondary)] bg-[var(--surface-info)]',
+    success: 'text-[var(--success)] bg-[var(--surface-success)]',
+    warning: 'text-[var(--warning)] bg-[var(--surface-warning)]',
+    critical: 'text-[var(--danger)] bg-[var(--surface-danger)]',
   }[severity];
 }

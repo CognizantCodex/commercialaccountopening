@@ -7,6 +7,8 @@
   --surface-elevated: rgba(22, 27, 34, 0.78);
   --surface-strong: rgba(31, 41, 55, 0.88);
   --surface-soft: rgba(13, 17, 23, 0.62);
+  --surface-muted: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.08);
   --foreground: #f0f6fc;
   --muted-foreground: #8b949e;
   --border: rgba(139, 148, 158, 0.22);
@@ -25,6 +27,18 @@
   --radius-2xl: 1.75rem;
   --shadow-card: 0 24px 64px rgba(0, 0, 0, 0.24);
   --shadow-soft: 0 12px 36px rgba(0, 0, 0, 0.18);
+  --shell-nav: rgba(11, 15, 23, 0.72);
+  --shell-topbar: rgba(13, 17, 23, 0.72);
+  --surface-accent-soft: rgba(0, 201, 177, 0.08);
+  --surface-accent: rgba(0, 201, 177, 0.16);
+  --surface-info: rgba(31, 111, 235, 0.16);
+  --surface-success: rgba(46, 160, 67, 0.16);
+  --surface-warning: rgba(242, 204, 96, 0.16);
+  --surface-danger: rgba(248, 81, 73, 0.16);
+  --overlay: rgba(3, 7, 18, 0.62);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --tooltip-bg: rgba(13, 17, 23, 0.92);
+  --tooltip-border: rgba(255, 255, 255, 0.08);
   --page-gradient:
     radial-gradient(circle at top right, rgba(31, 111, 235, 0.18), transparent 25%),
     radial-gradient(circle at top left, rgba(0, 201, 177, 0.12), transparent 26%),
@@ -41,12 +55,26 @@ html.light {
   --surface-elevated: rgba(255, 255, 255, 0.96);
   --surface-strong: rgba(239, 245, 255, 0.96);
   --surface-soft: rgba(226, 234, 247, 0.68);
+  --surface-muted: rgba(240, 246, 255, 0.84);
+  --surface-hover: rgba(226, 234, 247, 0.9);
   --foreground: #0f172a;
   --muted-foreground: #475569;
   --border: rgba(15, 23, 42, 0.12);
   --border-strong: rgba(15, 23, 42, 0.1);
   --shadow-card: 0 22px 48px rgba(15, 23, 42, 0.12);
   --shadow-soft: 0 12px 28px rgba(15, 23, 42, 0.08);
+  --shell-nav: rgba(248, 251, 255, 0.78);
+  --shell-topbar: rgba(248, 251, 255, 0.76);
+  --surface-accent-soft: rgba(0, 201, 177, 0.1);
+  --surface-accent: rgba(0, 201, 177, 0.14);
+  --surface-info: rgba(31, 111, 235, 0.12);
+  --surface-success: rgba(46, 160, 67, 0.12);
+  --surface-warning: rgba(242, 204, 96, 0.18);
+  --surface-danger: rgba(248, 81, 73, 0.12);
+  --overlay: rgba(148, 163, 184, 0.22);
+  --chart-grid: rgba(15, 23, 42, 0.08);
+  --tooltip-bg: rgba(255, 255, 255, 0.98);
+  --tooltip-border: rgba(15, 23, 42, 0.12);
   --page-gradient:
     radial-gradient(circle at top right, rgba(31, 111, 235, 0.1), transparent 30%),
     radial-gradient(circle at top left, rgba(0, 201, 177, 0.12), transparent 24%),
@@ -82,6 +110,12 @@ body::before {
   content: "";
   mask-image: radial-gradient(circle at center, black, transparent 85%);
   pointer-events: none;
+}
+
+.light body::before {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
 }
 
 a {

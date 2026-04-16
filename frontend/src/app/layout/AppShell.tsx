@@ -35,7 +35,7 @@ export function AppShell() {
       <GlobalHotkeys />
       <RouteAnnouncer />
       <CommandPalette />
-      <aside className="hidden border-r border-[var(--border)] bg-[color:rgba(11,15,23,0.72)] lg:block lg:w-80 lg:shrink-0 lg:backdrop-blur-xl">
+      <aside className="hidden border-r border-[var(--border)] bg-[var(--shell-nav)] lg:block lg:w-80 lg:shrink-0 lg:backdrop-blur-xl">
         <SidebarNav />
       </aside>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">

@@ -37,7 +37,7 @@ export function LiveActivityFeed({
           <button
             key={item.id}
             type="button"
-            className="w-full rounded-[1.25rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4 text-left transition-colors hover:bg-[color:rgba(255,255,255,0.05)]"
+            className="w-full rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-left transition-colors hover:bg-[var(--surface-hover)]"
             onClick={() => onSelect?.(item)}
           >
             <div className="flex items-center justify-between gap-2">

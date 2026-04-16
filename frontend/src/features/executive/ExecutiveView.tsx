@@ -79,7 +79,7 @@ export function ExecutiveView() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-[1.5rem] border border-[var(--border)] bg-[color:rgba(255,255,255,0.03)] p-4"
+                className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4"
               >
                 <div className="flex items-center gap-3">
                   <item.icon className="h-4 w-4 text-[var(--accent)]" />
