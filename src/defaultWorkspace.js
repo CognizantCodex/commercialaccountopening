@@ -262,4 +262,65 @@ export const defaultWorkspace = {
     confirmTerms: false,
   },
   additionalNotes: "",
+  submission: {
+    status: "draft",
+    referenceId: null,
+    submittedAt: null,
+    overallDecision: "not_started",
+    summary:
+      "When you submit the application, the orchestrator will run KYC, AML, document processing, and risk review.",
+    recommendedAction: "Complete the application and submit it for automated review.",
+  },
+  orchestration: {
+    status: "idle",
+    startedAt: null,
+    completedAt: null,
+    summary:
+      "No automated review has run yet. Submission starts the onboarding orchestrator.",
+    checks: {
+      kyc: {
+        key: "kyc",
+        label: "KYC",
+        status: "not_started",
+        decision: "pending",
+        summary: "Pending submission.",
+        flags: [],
+        integration: {
+          checkKyc: null,
+        },
+      },
+      aml: {
+        key: "aml",
+        label: "AML",
+        status: "not_started",
+        decision: "pending",
+        summary: "Pending submission.",
+        flags: [],
+      },
+      documentProcessing: {
+        key: "documentProcessing",
+        label: "Document processing",
+        status: "not_started",
+        decision: "pending",
+        summary: "Pending submission.",
+        flags: [],
+      },
+      risk: {
+        key: "risk",
+        label: "Risk",
+        status: "not_started",
+        decision: "pending",
+        summary: "Pending submission.",
+        flags: [],
+        score: null,
+        integration: {
+          checkRisk: null,
+        },
+      },
+    },
+    integrations: {
+      checkKyc: null,
+      checkRisk: null,
+    },
+  },
 };

@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useRef, useState } from "react";
-import { loadWorkspace, saveWorkspace } from "./api";
+import { loadWorkspace, saveWorkspace, submitWorkspace } from "./api";
 import { defaultWorkspace } from "./defaultWorkspace";
 
 const PHONE_DIGIT_LIMIT = 10;
@@ -139,6 +139,38 @@ function mergeWorkspace(candidate = {}) {
         ? candidate.bankingProfile.requestedProducts
         : defaultWorkspace.bankingProfile.requestedProducts,
   };
+  const submission = {
+    ...defaultWorkspace.submission,
+    ...(candidate.submission ?? {}),
+  };
+  const orchestration = {
+    ...defaultWorkspace.orchestration,
+    ...(candidate.orchestration ?? {}),
+    checks: {
+      ...defaultWorkspace.orchestration.checks,
+      ...(candidate.orchestration?.checks ?? {}),
+      kyc: {
+        ...defaultWorkspace.orchestration.checks.kyc,
+        ...(candidate.orchestration?.checks?.kyc ?? {}),
+      },
+      aml: {
+        ...defaultWorkspace.orchestration.checks.aml,
+        ...(candidate.orchestration?.checks?.aml ?? {}),
+      },
+      documentProcessing: {
+        ...defaultWorkspace.orchestration.checks.documentProcessing,
+        ...(candidate.orchestration?.checks?.documentProcessing ?? {}),
+      },
+      risk: {
+        ...defaultWorkspace.orchestration.checks.risk,
+        ...(candidate.orchestration?.checks?.risk ?? {}),
+      },
+    },
+    integrations: {
+      ...defaultWorkspace.orchestration.integrations,
+      ...(candidate.orchestration?.integrations ?? {}),
+    },
+  };
 
   return {
     ...defaultWorkspace,
@@ -170,6 +202,8 @@ function mergeWorkspace(candidate = {}) {
       monthlyOutgoing: sanitizeCurrencyAmount(bankingProfile.monthlyOutgoing),
       onlineBankingUsers: sanitizeWholeNumber(bankingProfile.onlineBankingUsers),
     },
+    submission,
+    orchestration,
     documents: {
       ...defaultWorkspace.documents,
       ...(candidate.documents ?? {}),
@@ -556,6 +590,15 @@ function buildValidationErrors(workspace) {
     });
   });
 
+  if (!workspace.beneficialOwners.some((owner) => owner.isAuthorizedSigner)) {
+    errors["beneficialOwners.authorizedSigner"] =
+      "Select at least one beneficial owner as an authorized signer.";
+  }
+
+  if (Object.values(workspace.documents ?? {}).filter(Boolean).length < 3) {
+    errors.documents = "Mark at least three supporting documents as ready.";
+  }
+
   workspace.declarationOptions.forEach((declaration) => {
     if (declaration.required && !workspace.declarations[declaration.key]) {
       errors[`declarations.${declaration.key}`] = declaration.title;
@@ -608,17 +651,23 @@ function getStepFieldKeys(stepId, workspace) {
         "bankingProfile.onlineBankingUsers",
       ];
     case "ownership":
-      return workspace.beneficialOwners.flatMap((owner) => [
-        `beneficialOwners.${owner.id}.fullName`,
-        `beneficialOwners.${owner.id}.title`,
-        `beneficialOwners.${owner.id}.ownershipPercentage`,
-        `beneficialOwners.${owner.id}.email`,
-        `beneficialOwners.${owner.id}.phone`,
-      ]);
+      return [
+        ...workspace.beneficialOwners.flatMap((owner) => [
+          `beneficialOwners.${owner.id}.fullName`,
+          `beneficialOwners.${owner.id}.title`,
+          `beneficialOwners.${owner.id}.ownershipPercentage`,
+          `beneficialOwners.${owner.id}.email`,
+          `beneficialOwners.${owner.id}.phone`,
+        ]),
+        "beneficialOwners.authorizedSigner",
+      ];
     case "documents":
-      return workspace.declarationOptions
-        .filter((declaration) => declaration.required)
-        .map((declaration) => `declarations.${declaration.key}`);
+      return [
+        "documents",
+        ...workspace.declarationOptions
+          .filter((declaration) => declaration.required)
+          .map((declaration) => `declarations.${declaration.key}`),
+      ];
     default:
       return [];
   }
@@ -628,6 +677,12 @@ function getFieldValue(workspace, fieldKey) {
   return fieldKey
     .split(".")
     .reduce((currentValue, key) => currentValue?.[key], workspace);
+}
+
+function formatDecision(value) {
+  return String(value ?? "pending")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function StepButton({ step, active, meta, onClick }) {
@@ -653,6 +708,72 @@ function SummaryChip({ label, value, tone = "default" }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  );
+}
+
+function ReviewCheckCard({ check }) {
+  const checkKyc = check.integration?.checkKyc;
+  const checkRisk = check.integration?.checkRisk;
+
+  return (
+    <article className="review-check-card">
+      <div className="review-check-header">
+        <div>
+          <p className="section-eyebrow">{check.label}</p>
+          <h4>{formatDecision(check.decision)}</h4>
+        </div>
+        {check.score !== null ? <strong>{check.score}/100</strong> : null}
+      </div>
+      <p>{check.summary}</p>
+      {check.flags?.length ? (
+        <div className="review-check-flags">
+          {check.flags.map((flag) => (
+            <p key={flag}>{flag}</p>
+          ))}
+        </div>
+      ) : (
+        <div className="review-check-flags empty">
+          <p>No review flags were raised.</p>
+        </div>
+      )}
+      {checkKyc ? (
+        <div className="integration-callout">
+          <p>
+            CheckKYC API: <strong>{checkKyc.transmissionMode}</strong>
+          </p>
+          <p>
+            External application ID:{" "}
+            <strong>
+              {checkKyc.externalApplicationId ?? "Pending external response"}
+            </strong>
+          </p>
+          <p>Response: <strong>{checkKyc.response}</strong></p>
+          {checkKyc.errorMessage ? <p>{checkKyc.errorMessage}</p> : null}
+          <p>{checkKyc.message}</p>
+        </div>
+      ) : null}
+      {checkRisk ? (
+        <div className="integration-callout">
+          <p>
+            checkRisk API: <strong>{checkRisk.transmissionMode}</strong>
+          </p>
+          <p>
+            External assessment ID:{" "}
+            <strong>
+              {checkRisk.externalAssessmentId ?? "Pending external response"}
+            </strong>
+          </p>
+          <p>Response: <strong>{checkRisk.response}</strong></p>
+          {checkRisk.riskScore !== null ? (
+            <p>
+              Risk score: <strong>{checkRisk.riskScore}</strong>
+            </p>
+          ) : null}
+          {checkRisk.recommendation ? <p>{checkRisk.recommendation}</p> : null}
+          <p>{checkRisk.message}</p>
+        </div>
+      ) : null}
+    </article>
   );
 }
 
@@ -870,6 +991,7 @@ function App() {
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [connectionState, setConnectionState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
+  const [submitState, setSubmitState] = useState("idle");
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
@@ -926,6 +1048,12 @@ function App() {
     workspace.steps[Math.max(currentStepIndex - 1, 0)] ?? workspace.steps[0];
   const validationErrors = buildValidationErrors(workspace);
   const currentStepFieldKeys = getStepFieldKeys(workspace.activeStep, workspace);
+  const allSubmissionFieldKeys = [
+    ...new Set(
+      workspace.steps.flatMap((step) => getStepFieldKeys(step.id, workspace)),
+    ),
+  ];
+  const orchestrationChecks = Object.values(workspace.orchestration.checks);
   const currentStepValidationMessages = [
     ...new Set(
       currentStepFieldKeys
@@ -938,6 +1066,7 @@ function App() {
     if (
       !hasBootstrapped ||
       !hasUnsavedChanges ||
+      submitState === "submitting" ||
       saveState !== "idle" ||
       currentStepFieldKeys.some((fieldKey) => {
         const fieldValue = getFieldValue(workspace, fieldKey);
@@ -958,6 +1087,7 @@ function App() {
     workspace,
     hasBootstrapped,
     hasUnsavedChanges,
+    submitState,
     saveState,
     currentStepFieldKeys,
     validationErrors,
@@ -1100,6 +1230,12 @@ function App() {
   ) {
     missingItems.push("Add at least one beneficial owner or control person.");
   }
+  if (validationErrors["beneficialOwners.authorizedSigner"]) {
+    missingItems.push(validationErrors["beneficialOwners.authorizedSigner"]);
+  }
+  if (validationErrors.documents) {
+    missingItems.push(validationErrors.documents);
+  }
   if (!workspace.declarations.confirmTerms) {
     missingItems.push("Review and accept the final declarations.");
   }
@@ -1113,12 +1249,22 @@ function App() {
       : connectionState === "fallback"
         ? "Draft mode"
         : "Connecting";
+  const submissionLabel =
+    workspace.submission.status === "submitted"
+      ? formatDecision(workspace.submission.overallDecision)
+      : "Draft";
   const saveLabel =
     saveState === "saving"
       ? "Saving draft..."
       : saveState === "saved"
         ? "All changes saved"
         : "Save draft";
+  const submitLabel =
+    submitState === "submitting"
+      ? "Submitting application..."
+      : workspace.submission.status === "submitted"
+        ? "Re-run orchestrator"
+        : "Submit application";
 
   function markDirty() {
     saveVersionRef.current += 1;
@@ -1148,6 +1294,28 @@ function App() {
 
   function getFieldError(fieldKey) {
     return touchedFields[fieldKey] ? validationErrors[fieldKey] ?? "" : "";
+  }
+
+  function invalidateSubmission(current) {
+    if (current.submission.status !== "submitted") {
+      return current;
+    }
+
+    return {
+      ...current,
+      submission: {
+        ...defaultWorkspace.submission,
+        summary:
+          "Changes were made after the last submission. Submit again to re-run KYC, AML, document processing, and risk review.",
+        recommendedAction:
+          "Submit the updated application to refresh the orchestrator decision.",
+      },
+      orchestration: {
+        ...defaultWorkspace.orchestration,
+        summary:
+          "Changes were made after the last submission. Submit again to refresh the review pipeline.",
+      },
+    };
   }
 
   async function persistWorkspace(mode = "manual") {
@@ -1193,48 +1361,70 @@ function App() {
   }
 
   function updateSection(section, field, value) {
-    setWorkspace((current) => ({
-      ...current,
-      [section]: {
-        ...current[section],
-        [field]: value,
-      },
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        [section]: {
+          ...current[section],
+          [field]: value,
+        },
+      };
+    });
     markDirty();
   }
 
   function updateTopLevel(field, value) {
-    setWorkspace((current) => ({
-      ...current,
-      [field]: value,
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        [field]: value,
+      };
+    });
     markDirty();
   }
 
   function updateOwner(ownerId, field, value) {
-    setWorkspace((current) => ({
-      ...current,
-      beneficialOwners: current.beneficialOwners.map((owner) =>
-        owner.id === ownerId ? { ...owner, [field]: value } : owner,
-      ),
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        beneficialOwners: current.beneficialOwners.map((owner) =>
+          owner.id === ownerId ? { ...owner, [field]: value } : owner,
+        ),
+      };
+    });
     markDirty();
   }
 
   function removeOwner(ownerId) {
-    setWorkspace((current) => ({
-      ...current,
-      beneficialOwners: current.beneficialOwners.filter((owner) => owner.id !== ownerId),
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        beneficialOwners: current.beneficialOwners.filter(
+          (owner) => owner.id !== ownerId,
+        ),
+      };
+    });
     markDirty();
   }
 
   function addOwner() {
     startTransition(() => {
-      setWorkspace((current) => ({
-        ...current,
-        beneficialOwners: [...current.beneficialOwners, createOwner()],
-      }));
+      setWorkspace((current) => {
+        const nextWorkspace = invalidateSubmission(current);
+
+        return {
+          ...nextWorkspace,
+          beneficialOwners: [...current.beneficialOwners, createOwner()],
+        };
+      });
     });
     markDirty();
   }
@@ -1250,39 +1440,51 @@ function App() {
   }
 
   function toggleProduct(product) {
-    setWorkspace((current) => ({
-      ...current,
-      bankingProfile: {
-        ...current.bankingProfile,
-        requestedProducts: current.bankingProfile.requestedProducts.includes(product)
-          ? current.bankingProfile.requestedProducts.filter(
-              (existing) => existing !== product,
-            )
-          : [...current.bankingProfile.requestedProducts, product],
-      },
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        bankingProfile: {
+          ...current.bankingProfile,
+          requestedProducts: current.bankingProfile.requestedProducts.includes(product)
+            ? current.bankingProfile.requestedProducts.filter(
+                (existing) => existing !== product,
+              )
+            : [...current.bankingProfile.requestedProducts, product],
+        },
+      };
+    });
     markDirty();
   }
 
   function toggleDocument(key) {
-    setWorkspace((current) => ({
-      ...current,
-      documents: {
-        ...current.documents,
-        [key]: !current.documents[key],
-      },
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        documents: {
+          ...current.documents,
+          [key]: !current.documents[key],
+        },
+      };
+    });
     markDirty();
   }
 
   function toggleDeclaration(key) {
-    setWorkspace((current) => ({
-      ...current,
-      declarations: {
-        ...current.declarations,
-        [key]: !current.declarations[key],
-      },
-    }));
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        declarations: {
+          ...current.declarations,
+          [key]: !current.declarations[key],
+        },
+      };
+    });
     markDirty();
   }
 
@@ -1295,6 +1497,65 @@ function App() {
     }
 
     await persistWorkspace("manual");
+  }
+
+  async function handleSubmitApplication() {
+    markFieldsTouched(allSubmissionFieldKeys);
+
+    const firstInvalidStep = workspace.steps.find((step) =>
+      getStepFieldKeys(step.id, workspace).some((fieldKey) => validationErrors[fieldKey]),
+    );
+
+    if (firstInvalidStep) {
+      handleStepChange(firstInvalidStep.id);
+      setStatusMessage(
+        "Please complete the highlighted fields before submitting the application.",
+      );
+      return;
+    }
+
+    const versionAtRequest = saveVersionRef.current;
+    const snapshot = workspace;
+
+    setSubmitState("submitting");
+    setStatusMessage(
+      "Submitting the application to the onboarding orchestrator for KYC, AML, document processing, and risk review...",
+    );
+
+    try {
+      const submittedWorkspace = await submitWorkspace(snapshot);
+      const mergedWorkspace = mergeWorkspace(submittedWorkspace);
+
+      setConnectionState("connected");
+      setSaveState("saved");
+      setSubmitState("submitted");
+
+      if (saveVersionRef.current === versionAtRequest) {
+        setWorkspace(mergedWorkspace);
+        setHasUnsavedChanges(false);
+      } else {
+        setWorkspace((current) => ({
+          ...current,
+          submission: mergedWorkspace.submission,
+          orchestration: mergedWorkspace.orchestration,
+          lastUpdatedAt: mergedWorkspace.lastUpdatedAt,
+        }));
+      }
+
+      setStatusMessage(
+        "Application submitted. The orchestrator completed KYC, AML, document processing, and risk review.",
+      );
+    } catch (error) {
+      setSubmitState("error");
+      if (error?.status !== 400) {
+        setConnectionState("fallback");
+      }
+      setStatusMessage(
+        error?.payload?.issues?.[0]?.message ??
+          error?.message ??
+          "We couldn't submit the application right now. Please review the form and try again.",
+      );
+    }
   }
 
   function handleContinue() {
@@ -1311,9 +1572,7 @@ function App() {
     }
 
     if (currentStepIndex === workspace.steps.length - 1) {
-      setStatusMessage(
-        "All required declarations are complete. Save the draft to keep the application current.",
-      );
+      void handleSubmitApplication();
       return;
     }
 
@@ -1924,6 +2183,12 @@ function App() {
             </button>
           </div>
 
+          {getFieldError("beneficialOwners.authorizedSigner") ? (
+            <p className="group-error-copy">
+              {getFieldError("beneficialOwners.authorizedSigner")}
+            </p>
+          ) : null}
+
           <div className="owner-stack">
             {workspace.beneficialOwners.map((owner, index) => (
               <OwnerCard
@@ -1960,6 +2225,10 @@ function App() {
               </p>
             </div>
           </div>
+
+          {getFieldError("documents") ? (
+            <p className="group-error-copy">{getFieldError("documents")}</p>
+          ) : null}
 
           <div className="option-grid">
             {workspace.documentOptions.map((document) => (
@@ -2001,6 +2270,45 @@ function App() {
             placeholder="Optional notes for the onboarding or treasury implementation team."
           />
         </section>
+
+        <section className="form-card">
+          <div className="section-heading">
+            <div>
+              <p className="section-eyebrow">Onboarding orchestrator</p>
+              <h3>Automated review pipeline</h3>
+              <p>
+                Submission triggers a single orchestrator workflow that runs KYC,
+                AML, document processing, and risk review.
+              </p>
+            </div>
+          </div>
+
+          <div className="orchestration-summary">
+            <div className="summary-row">
+              <span>Submission status</span>
+              <strong>{formatDecision(workspace.submission.status)}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Reference</span>
+              <strong>{workspace.submission.referenceId ?? "Not submitted yet"}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Decision</span>
+              <strong>{formatDecision(workspace.submission.overallDecision)}</strong>
+            </div>
+          </div>
+
+          <p className="orchestration-copy">{workspace.submission.summary}</p>
+          <p className="orchestration-copy subtle">
+            {workspace.submission.recommendedAction}
+          </p>
+
+          <div className="review-check-grid">
+            {orchestrationChecks.map((check) => (
+              <ReviewCheckCard key={check.key} check={check} />
+            ))}
+          </div>
+        </section>
       </>
     );
   }
@@ -2033,6 +2341,7 @@ function App() {
         <div className="hero-meta">
           <SummaryChip label="Completion" value={`${completionPercentage}%`} tone="accent" />
           <SummaryChip label="Status" value={backendLabel} />
+          <SummaryChip label="Submission" value={submissionLabel} />
           <SummaryChip label="Last sync" value={lastSyncedLabel} />
         </div>
       </header>
@@ -2080,7 +2389,7 @@ function App() {
                 type="button"
                 className="primary-button"
                 onClick={handleSave}
-                disabled={saveState === "saving"}
+                disabled={saveState === "saving" || submitState === "submitting"}
               >
                 {saveLabel}
               </button>
@@ -2088,8 +2397,11 @@ function App() {
                 type="button"
                 className="secondary-button"
                 onClick={handleContinue}
+                disabled={submitState === "submitting"}
               >
-                Continue
+                {currentStepIndex === workspace.steps.length - 1
+                  ? submitLabel
+                  : "Continue"}
               </button>
             </div>
           </section>
@@ -2121,9 +2433,10 @@ function App() {
               type="button"
               className="primary-button"
               onClick={handleContinue}
+              disabled={submitState === "submitting"}
             >
               {currentStepIndex === workspace.steps.length - 1
-                ? "Review application"
+                ? submitLabel
                 : `Next: ${nextStep.label}`}
             </button>
           </section>
@@ -2168,7 +2481,25 @@ function App() {
                 <span>Documents marked ready</span>
                 <strong>{Object.values(workspace.documents).filter(Boolean).length}</strong>
               </div>
+              <div className="summary-row">
+                <span>Orchestrator decision</span>
+                <strong>{formatDecision(workspace.submission.overallDecision)}</strong>
+              </div>
             </div>
+          </div>
+
+          <div className="summary-card">
+            <p className="section-eyebrow">Review pipeline</p>
+            <h3>Orchestrator checks</h3>
+            <div className="summary-rows">
+              {orchestrationChecks.map((check) => (
+                <div key={check.key} className="summary-row">
+                  <span>{check.label}</span>
+                  <strong>{formatDecision(check.decision)}</strong>
+                </div>
+              ))}
+            </div>
+            <p className="progress-copy">{workspace.orchestration.summary}</p>
           </div>
 
           <div className="summary-card">

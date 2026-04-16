@@ -2,6 +2,13 @@ import { access, mkdir, readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
+import { submitCheckRiskApplication } from "./checkRiskApi.js";
+import { submitCheckKycApplication } from "./checkKycApi.js";
+import { KycFailedError } from "./agents/kycAgent.js";
+import {
+  collectSubmissionIssues,
+  orchestrateApplicationSubmission,
+} from "./orchestrator.js";
 import { defaultWorkspace } from "../src/defaultWorkspace.js";
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -18,11 +25,19 @@ function json(value, statusCode = 200) {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     },
     body: JSON.stringify(value),
   };
+}
+
+class ValidationError extends Error {
+  constructor(message, issues = []) {
+    super(message);
+    this.name = "ValidationError";
+    this.issues = issues;
+  }
 }
 
 function clone(value) {
@@ -63,6 +78,13 @@ async function initializeDatabase() {
       draft_id TEXT NOT NULL,
       payload TEXT NOT NULL,
       saved_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS application_submissions (
+      submission_id TEXT PRIMARY KEY,
+      draft_id TEXT NOT NULL,
+      submission_payload TEXT NOT NULL,
+      orchestration_result TEXT NOT NULL,
+      submitted_at TEXT NOT NULL
     );
   `);
 
@@ -142,6 +164,51 @@ function saveWorkspace(workspace) {
   }
 }
 
+function recordSubmission(submissionId, workspace, orchestrationResult) {
+  db.prepare(`
+    INSERT INTO application_submissions (
+      submission_id,
+      draft_id,
+      submission_payload,
+      orchestration_result,
+      submitted_at
+    )
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    submissionId,
+    PRIMARY_DRAFT_ID,
+    JSON.stringify(workspace),
+    JSON.stringify(orchestrationResult),
+    orchestrationResult.submission.submittedAt,
+  );
+}
+
+async function submitWorkspace(workspace) {
+  const issues = collectSubmissionIssues(workspace);
+
+  if (issues.length) {
+    throw new ValidationError(
+      "The application is incomplete or contains invalid data.",
+      issues,
+    );
+  }
+
+  const orchestrationResult = await orchestrateApplicationSubmission(workspace);
+  const nextWorkspace = saveWorkspace({
+    ...workspace,
+    submission: orchestrationResult.submission,
+    orchestration: orchestrationResult.orchestration,
+  });
+
+  recordSubmission(
+    orchestrationResult.submission.referenceId,
+    nextWorkspace,
+    orchestrationResult,
+  );
+
+  return nextWorkspace;
+}
+
 function readRequestBody(request) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -169,7 +236,7 @@ const server = createServer(async (request, response) => {
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,PUT,OPTIONS",
+        "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       });
       response.end();
@@ -203,15 +270,70 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/account-opening/submit") {
+      const rawBody = await readRequestBody(request);
+      const workspace = JSON.parse(rawBody);
+      const result = json(await submitWorkspace(workspace));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/check-kyc/applications"
+    ) {
+      const rawBody = await readRequestBody(request);
+      const workspace = JSON.parse(rawBody);
+      const result = json(await submitCheckKycApplication(workspace));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/check-risk/applications"
+    ) {
+      const rawBody = await readRequestBody(request);
+      const workspace = JSON.parse(rawBody);
+      const result = json(await submitCheckRiskApplication(workspace));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     const result = json({ error: "Route not found." }, 404);
     response.writeHead(result.statusCode, result.headers);
     response.end(result.body);
   } catch (error) {
-    const message =
+    const result =
       error instanceof SyntaxError
-        ? "Invalid JSON payload."
-        : "Unexpected server error.";
-    const result = json({ error: message }, 500);
+        ? json({ error: "Invalid JSON payload." }, 500)
+        : error instanceof ValidationError
+          ? json({ error: error.message, issues: error.issues }, 400)
+          : error instanceof KycFailedError
+            ? (() => {
+                const message = String(error.message ?? "KYC Failed.");
+                const normalizedMessage = message.startsWith("KYC Failed")
+                  ? message
+                  : `KYC Failed: ${message}`;
+
+                return json(
+                  {
+                    error: normalizedMessage,
+                    issues: [
+                      {
+                        fieldKey: "submission",
+                        message: normalizedMessage,
+                      },
+                    ],
+                    integration: error.integration,
+                  },
+                  400,
+                );
+              })()
+          : json({ error: "Unexpected server error." }, 500);
     response.writeHead(result.statusCode, result.headers);
     response.end(result.body);
   }
