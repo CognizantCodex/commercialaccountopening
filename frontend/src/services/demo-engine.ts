@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { usePlatformStore } from '@/store';
 
 export function useDemoEngine() {
+  const dataSource = usePlatformStore((state) => state.dataSource);
   const autoplay = usePlatformStore((state) => state.autoplay);
   const speedMultiplier = usePlatformStore((state) => state.speedMultiplier);
   const currentStep = usePlatformStore((state) => state.currentStep);
@@ -9,7 +10,7 @@ export function useDemoEngine() {
   const stepTimeline = usePlatformStore((state) => state.stepTimeline);
 
   useEffect(() => {
-    if (!autoplay || currentStep >= timelineLength) {
+    if (dataSource !== 'demo' || !autoplay || currentStep >= timelineLength) {
       return;
     }
 
@@ -19,5 +20,5 @@ export function useDemoEngine() {
     }, delay);
 
     return () => window.clearInterval(timer);
-  }, [autoplay, currentStep, speedMultiplier, stepTimeline, timelineLength]);
+  }, [autoplay, currentStep, dataSource, speedMultiplier, stepTimeline, timelineLength]);
 }

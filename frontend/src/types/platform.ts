@@ -16,6 +16,8 @@ export type ThemeMode = 'dark' | 'light' | 'system';
 
 export type DemoMode = 'autoplay' | 'interactive';
 
+export type DataSourceMode = 'demo' | 'live';
+
 export type TimelineEventType =
   | 'document_uploaded'
   | 'agent_classified'

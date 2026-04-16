@@ -93,5 +93,143 @@
       "decision": "flagged",
       "confidence": 78
     }
+  },
+  {
+    "id": "evt-007",
+    "timeOffsetMs": 10800,
+    "timestamp": "2026-04-16T09:00:12Z",
+    "type": "document_uploaded",
+    "title": "Meridian uploads refreshed source-of-wealth packet",
+    "description": "An updated source-of-wealth package lands for Meridian Commodities Group with new controller evidence.",
+    "severity": "info",
+    "caseId": "case-meridian-003",
+    "clientId": "client-meridian",
+    "routeHint": "cases",
+    "payload": {
+      "documentId": "doc-meridian-ubo",
+      "documentType": "Source of Wealth Addendum",
+      "completenessGain": 9,
+      "extractedField": "source-of-wealth"
+    }
+  },
+  {
+    "id": "evt-008",
+    "timeOffsetMs": 12600,
+    "timestamp": "2026-04-16T09:00:14Z",
+    "type": "agent_classified",
+    "title": "Meridian ownership graph reclassified",
+    "description": "The entity-resolution agent recalculates Meridian's trust structure and reduces residual uncertainty.",
+    "severity": "success",
+    "caseId": "case-meridian-003",
+    "clientId": "client-meridian",
+    "routeHint": "agents",
+    "payload": {
+      "confidence": 91,
+      "riskScore": 61,
+      "latencyMs": 438
+    }
+  },
+  {
+    "id": "evt-009",
+    "timeOffsetMs": 14400,
+    "timestamp": "2026-04-16T09:00:16Z",
+    "type": "advisor_resolved",
+    "title": "Meridian exception cleared after analyst review",
+    "description": "The analyst validates the refreshed evidence and clears the aging source-of-wealth exception.",
+    "severity": "success",
+    "caseId": "case-meridian-003",
+    "clientId": "client-meridian",
+    "routeHint": "cases",
+    "payload": {
+      "documentId": "doc-meridian-ubo",
+      "ruleId": "rule-meridian-source",
+      "newRiskScore": 56,
+      "resolutionRationale": "Analyst validated the refreshed source-of-wealth package and approved the case for monitoring."
+    }
+  },
+  {
+    "id": "evt-010",
+    "timeOffsetMs": 16200,
+    "timestamp": "2026-04-16T09:00:18Z",
+    "type": "monitoring_alert",
+    "title": "Polaris watchlist delta spikes in Sao Paulo",
+    "description": "Continuous monitoring detects a material watchlist delta tied to a logistics counterparty in Sao Paulo.",
+    "severity": "warning",
+    "caseId": "case-polaris-005",
+    "clientId": "client-polaris",
+    "routeHint": "monitoring",
+    "payload": {
+      "city": "Sao Paulo",
+      "falsePositiveRisk": 27
+    }
+  },
+  {
+    "id": "evt-011",
+    "timeOffsetMs": 18000,
+    "timestamp": "2026-04-16T09:00:20Z",
+    "type": "governance_logged",
+    "title": "Polaris escalation package logged for governance",
+    "description": "The governance console captures the Polaris watchlist rationale, analyst notes, and linked evidence.",
+    "severity": "info",
+    "caseId": "case-polaris-005",
+    "clientId": "client-polaris",
+    "routeHint": "governance",
+    "payload": {
+      "decision": "escalated",
+      "confidence": 81,
+      "primarySourceLabel": "Monitoring escalation packet"
+    }
+  },
+  {
+    "id": "evt-012",
+    "timeOffsetMs": 19800,
+    "timestamp": "2026-04-16T09:00:22Z",
+    "type": "document_uploaded",
+    "title": "Orion adds annual registry refresh",
+    "description": "A scheduled registry refresh arrives for Orion Maritime Finance and triggers a lightweight review cycle.",
+    "severity": "info",
+    "caseId": "case-orion-002",
+    "clientId": "client-orion",
+    "routeHint": "cases",
+    "payload": {
+      "documentId": "doc-orion-incorp",
+      "documentType": "Annual Registry Refresh",
+      "completenessGain": 2,
+      "extractedField": "status-refresh"
+    }
+  },
+  {
+    "id": "evt-013",
+    "timeOffsetMs": 21600,
+    "timestamp": "2026-04-16T09:00:24Z",
+    "type": "agent_classified",
+    "title": "Orion benchmark case reconfirmed by AI",
+    "description": "The benchmark straight-through case is reclassified to confirm the controller graph still matches the registry.",
+    "severity": "success",
+    "caseId": "case-orion-002",
+    "clientId": "client-orion",
+    "routeHint": "agents",
+    "payload": {
+      "confidence": 97,
+      "riskScore": 28,
+      "latencyMs": 204
+    }
+  },
+  {
+    "id": "evt-014",
+    "timeOffsetMs": 23400,
+    "timestamp": "2026-04-16T09:00:26Z",
+    "type": "governance_logged",
+    "title": "Orion benchmark audit snapshot preserved",
+    "description": "The platform archives Orion's straight-through reasoning pack as a benchmark for audit and control review.",
+    "severity": "info",
+    "caseId": "case-orion-002",
+    "clientId": "client-orion",
+    "routeHint": "governance",
+    "payload": {
+      "decision": "approved",
+      "confidence": 97,
+      "primarySourceLabel": "Benchmark control snapshot"
+    }
   }
 ]

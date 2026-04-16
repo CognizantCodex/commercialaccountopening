@@ -1,0 +1,273 @@
+asyncapi: 3.0.0
+info:
+  title: Aurora Commercial Account Opening Events
+  version: 1.0.0
+  description: >
+    Async contract for the Aurora Atlas Capital onboarding storyline. These events let
+    workflow, monitoring, analytics, and governance consumers react to changes in the
+    KYC lifecycle without tight coupling to the synchronous API.
+defaultContentType: application/json
+servers:
+  localKafka:
+    host: localhost:9092
+    protocol: kafka
+    description: Local development broker
+channels:
+  documentUploaded:
+    address: kyc.case.document-uploaded
+    messages:
+      documentUploaded:
+        $ref: "#/components/messages/DocumentUploaded"
+  entityClassified:
+    address: kyc.case.entity-classified
+    messages:
+      entityClassified:
+        $ref: "#/components/messages/EntityClassified"
+  qcFailed:
+    address: kyc.case.qc-failed
+    messages:
+      qcFailed:
+        $ref: "#/components/messages/QcFailed"
+  exceptionResolved:
+    address: kyc.case.exception-resolved
+    messages:
+      exceptionResolved:
+        $ref: "#/components/messages/ExceptionResolved"
+  monitoringAlertTriggered:
+    address: kyc.case.monitoring-alert-triggered
+    messages:
+      monitoringAlertTriggered:
+        $ref: "#/components/messages/MonitoringAlertTriggered"
+  governanceDecisionLogged:
+    address: kyc.case.governance-decision-logged
+    messages:
+      governanceDecisionLogged:
+        $ref: "#/components/messages/GovernanceDecisionLogged"
+operations:
+  publishDocumentUploaded:
+    action: send
+    channel:
+      $ref: "#/channels/documentUploaded"
+    title: Publish document uploaded event
+    summary: Emitted when a new onboarding document is registered for a case.
+    messages:
+      - $ref: "#/channels/documentUploaded/messages/documentUploaded"
+  publishEntityClassified:
+    action: send
+    channel:
+      $ref: "#/channels/entityClassified"
+    title: Publish entity classified event
+    summary: Emitted when the AI entity agent produces a controller hierarchy.
+    messages:
+      - $ref: "#/channels/entityClassified/messages/entityClassified"
+  publishQcFailed:
+    action: send
+    channel:
+      $ref: "#/channels/qcFailed"
+    title: Publish QC failure event
+    summary: Emitted when a rule failure blocks straight-through processing.
+    messages:
+      - $ref: "#/channels/qcFailed/messages/qcFailed"
+  publishExceptionResolved:
+    action: send
+    channel:
+      $ref: "#/channels/exceptionResolved"
+    title: Publish manual resolution event
+    summary: Emitted when an analyst resolves a QC exception with supporting evidence.
+    messages:
+      - $ref: "#/channels/exceptionResolved/messages/exceptionResolved"
+  publishMonitoringAlertTriggered:
+    action: send
+    channel:
+      $ref: "#/channels/monitoringAlertTriggered"
+    title: Publish monitoring alert event
+    summary: Emitted when continuous KYC identifies a new downstream alert.
+    messages:
+      - $ref: "#/channels/monitoringAlertTriggered/messages/monitoringAlertTriggered"
+  publishGovernanceDecisionLogged:
+    action: send
+    channel:
+      $ref: "#/channels/governanceDecisionLogged"
+    title: Publish governance decision event
+    summary: Emitted when the platform records an explainability or override decision.
+    messages:
+      - $ref: "#/channels/governanceDecisionLogged/messages/governanceDecisionLogged"
+components:
+  messages:
+    DocumentUploaded:
+      name: DocumentUploaded
+      title: Document uploaded
+      summary: Additional onboarding evidence was attached to a case.
+      headers:
+        $ref: "#/components/schemas/EventHeaders"
+      payload:
+        $ref: "#/components/schemas/DocumentUploadedPayload"
+    EntityClassified:
+      name: EntityClassified
+      title: Entity structure classified
+      summary: AI classification completed for the ownership or controller structure.
+      headers:
+        $ref: "#/components/schemas/EventHeaders"
+      payload:
+        $ref: "#/components/schemas/EntityClassifiedPayload"
+    QcFailed:
+      name: QcFailed
+      title: QC rule failed
+      summary: A quality control rule failed and the case requires intervention.
+      headers:
+        $ref: "#/components/schemas/EventHeaders"
+      payload:
+        $ref: "#/components/schemas/QcFailedPayload"
+    ExceptionResolved:
+      name: ExceptionResolved
+      title: Exception resolved
+      summary: A failed QC item was remediated by a human reviewer.
+      headers:
+        $ref: "#/components/schemas/EventHeaders"
+      payload:
+        $ref: "#/components/schemas/ExceptionResolvedPayload"
+    MonitoringAlertTriggered:
+      name: MonitoringAlertTriggered
+      title: Monitoring alert triggered
+      summary: Continuous KYC produced a location-aware downstream alert.
+      headers:
+        $ref: "#/components/schemas/EventHeaders"
+      payload:
+        $ref: "#/components/schemas/MonitoringAlertTriggeredPayload"
+    GovernanceDecisionLogged:
+      name: GovernanceDecisionLogged
+      title: Governance decision logged
+      summary: The platform recorded an explainable decision or override outcome.
+      headers:
+        $ref: "#/components/schemas/EventHeaders"
+      payload:
+        $ref: "#/components/schemas/GovernanceDecisionLoggedPayload"
+  schemas:
+    EventHeaders:
+      type: object
+      required: [eventId, correlationId, occurredAt, producer]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        correlationId:
+          type: string
+          description: Shared identifier tying Aurora lifecycle events together.
+        occurredAt:
+          type: string
+          format: date-time
+        producer:
+          type: string
+          description: Service or workflow that emitted the message.
+    CaseContext:
+      type: object
+      required: [caseId, clientId, caseName]
+      properties:
+        caseId:
+          type: string
+        clientId:
+          type: string
+        caseName:
+          type: string
+    DocumentUploadedPayload:
+      type: object
+      required: [case, documentType, completenessGain, uploadedBy]
+      properties:
+        case:
+          $ref: "#/components/schemas/CaseContext"
+        documentType:
+          type: string
+        completenessGain:
+          type: integer
+        uploadedBy:
+          type: string
+        sourceSystem:
+          type: string
+      examples:
+        - case:
+            caseId: case-aurora-001
+            clientId: client-aurora
+            caseName: Aurora Atlas Capital Prime Brokerage Expansion
+          documentType: Updated UBO Register
+          completenessGain: 12
+          uploadedBy: ava.lewis
+          sourceSystem: advisor-portal
+    EntityClassifiedPayload:
+      type: object
+      required: [case, confidence, latencyMs, controllerCount]
+      properties:
+        case:
+          $ref: "#/components/schemas/CaseContext"
+        confidence:
+          type: integer
+        latencyMs:
+          type: integer
+        controllerCount:
+          type: integer
+        agentName:
+          type: string
+    QcFailedPayload:
+      type: object
+      required: [case, failedRule, rationale, severity]
+      properties:
+        case:
+          $ref: "#/components/schemas/CaseContext"
+        failedRule:
+          type: string
+        rationale:
+          type: string
+        severity:
+          type: string
+          enum: [warning, critical]
+    ExceptionResolvedPayload:
+      type: object
+      required: [case, resolvedBy, resolutionNote]
+      properties:
+        case:
+          $ref: "#/components/schemas/CaseContext"
+        resolvedBy:
+          type: string
+        resolutionNote:
+          type: string
+        updatedRiskScore:
+          type: integer
+        evidenceReferences:
+          type: array
+          items:
+            type: string
+    MonitoringAlertTriggeredPayload:
+      type: object
+      required: [case, city, narrative, severity, falsePositiveRisk]
+      properties:
+        case:
+          $ref: "#/components/schemas/CaseContext"
+        city:
+          type: string
+        jurisdiction:
+          type: string
+        narrative:
+          type: string
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        falsePositiveRisk:
+          type: integer
+    GovernanceDecisionLoggedPayload:
+      type: object
+      required: [case, decision, confidence, reviewer, reasoningSummary]
+      properties:
+        case:
+          $ref: "#/components/schemas/CaseContext"
+        decision:
+          type: string
+          enum: [approved, flagged, overridden]
+        confidence:
+          type: integer
+        reviewer:
+          type: string
+        reasoningSummary:
+          type: string
+        sourceAttribution:
+          type: array
+          items:
+            type: string

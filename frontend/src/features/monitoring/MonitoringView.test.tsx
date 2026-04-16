@@ -10,6 +10,7 @@ describe('MonitoringView', () => {
     usePlatformStore.setState({
       commandPaletteOpen: false,
       currentRoute: 'executive',
+      dataSource: 'demo',
       focusedCaseId: null,
       focusedRegion: null,
       themeMode: 'dark',
