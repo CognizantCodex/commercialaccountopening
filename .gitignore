@@ -1,3 +1,12 @@
+node_modules
+dist
+.DS_Store
+.tools/
+backend/target
+*.class
+server/data/workspace-store.json
+server/data/corporate-account-opening.sqlite
+server/data/corporate-account-opening.sqlite-*
 templates/
 .kiro/
 .github/*
