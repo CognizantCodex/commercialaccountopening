@@ -1,0 +1,26 @@
+:root {
+  font-family: Georgia, "Times New Roman", serif;
+  color: #182126;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.6), transparent 28%),
+    radial-gradient(circle at right, rgba(182, 99, 47, 0.12), transparent 25%),
+    linear-gradient(145deg, #f4efe4 0%, #efe6d7 45%, #e3d3bc 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}

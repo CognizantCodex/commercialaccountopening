@@ -1,0 +1,15 @@
+{
+  "name": "commercial-onboarding-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node.js backend for commercial account opening advisory decisions",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "test": "node test/evaluator.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
