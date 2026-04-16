@@ -79,6 +79,10 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'aml',
+        element: <Navigate to="/onboarding" replace />,
+      },
+      {
         path: 'cases',
         element: (
           <Suspense fallback={<RouteFallback />}>

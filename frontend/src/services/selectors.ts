@@ -13,7 +13,6 @@ export const routeOrder: DashboardRoute[] = [
   'onboarding',
   'agents',
   'cases',
-  'monitoring',
   'governance',
 ];
 

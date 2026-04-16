@@ -810,9 +810,10 @@ export function OnboardingView() {
               AML API details
             </p>
             <ul className="mt-3 grid gap-2 text-sm leading-6 text-[var(--muted-foreground)]">
-              <li>Base URL: <code>http://localhost:8080</code></li>
+              <li>Base URL: <a className="text-[var(--accent)] underline-offset-4 hover:underline" href="http://localhost:8080/api/health" target="_blank" rel="noreferrer">http://localhost:8080</a></li>
               <li>Check transaction: <code>POST /api/aml/check_transaction</code></li>
               <li>Review case: <code>POST /api/aml/review_case</code></li>
+              <li>Swagger JSON: <a className="text-[var(--accent)] underline-offset-4 hover:underline" href="http://localhost:8080/api/docs/openapi-aml.json" target="_blank" rel="noreferrer">/api/docs/openapi-aml.json</a></li>
               <li>Response mode: <code>application/json</code></li>
             </ul>
           </div>
