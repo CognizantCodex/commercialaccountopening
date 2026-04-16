@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GaugeChart } from '@/components/charts/GaugeChart';
 import { LiveActivityFeed } from '@/components/charts/LiveActivityFeed';
@@ -21,11 +22,14 @@ export function MonitoringView() {
   const regionPerformance = usePlatformStore((state) => state.regionPerformance);
   const falsePositiveGauge = usePlatformStore((state) => state.falsePositiveGauge);
   const riskHistogram = usePlatformStore((state) => state.riskHistogram);
-  const activityFeed = usePlatformStore((state) =>
-    state.activityFeed.filter((item) => item.routeHint === 'monitoring' || item.severity === 'critical'),
-  );
+  const activityFeed = usePlatformStore((state) => state.activityFeed);
   const selectCase = usePlatformStore((state) => state.selectCase);
   const focusRegion = usePlatformStore((state) => state.focusRegion);
+  const monitoringActivityFeed = useMemo(
+    () =>
+      activityFeed.filter((item) => item.routeHint === 'monitoring' || item.severity === 'critical'),
+    [activityFeed],
+  );
 
   return (
     <div className="grid gap-6">
@@ -53,7 +57,7 @@ export function MonitoringView() {
           </div>
         </Card>
         <LiveActivityFeed
-          items={activityFeed.length > 0 ? activityFeed : usePlatformStore.getState().activityFeed}
+          items={monitoringActivityFeed.length > 0 ? monitoringActivityFeed : activityFeed}
           title="Monitoring event stream"
           onSelect={(item) => {
             void navigate(`/${item.routeHint}`);
