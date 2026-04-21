@@ -1,0 +1,1208 @@
+openapi: 3.0.3
+info:
+  title: KYC Fabric Platform API
+  version: 1.0.0
+  description: >
+    Swagger/OpenAPI contract for the Spring Boot API that powers the KYC Fabric
+    workspace. The live controller exposes both `/api` and `/api/v1` prefixes.
+servers:
+  - url: http://localhost:8080/api
+    description: Local compatibility prefix
+  - url: http://localhost:8080/api/v1
+    description: Local versioned prefix
+tags:
+  - name: Platform
+  - name: Cases
+  - name: Screening
+  - name: Monitoring
+  - name: Governance
+  - name: Streaming
+paths:
+  /platform/snapshot:
+    get:
+      tags: [Platform]
+      summary: Get the aggregated platform snapshot used by the workspace
+      operationId: getPlatformSnapshot
+      responses:
+        '200':
+          description: Snapshot used to populate executive, cases, agent, monitoring, and governance views.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSnapshotResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /cases:
+    get:
+      tags: [Cases]
+      summary: List all compliance cases
+      operationId: listCases
+      responses:
+        '200':
+          description: Current case inventory.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CaseRecord'
+    post:
+      tags: [Cases]
+      summary: Create a new compliance case
+      operationId: createCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCaseRequest'
+      responses:
+        '201':
+          description: Case created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /checkKYC:
+    post:
+      tags: [Screening]
+      summary: Run the platform CheckKYC evaluation
+      operationId: checkKyc
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckKycRequest'
+      responses:
+        '200':
+          description: CheckKYC result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckKycResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /cases/{caseId}:
+    get:
+      tags: [Cases]
+      summary: Get a single case
+      operationId: getCase
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      responses:
+        '200':
+          description: Case detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cases/{caseId}/documents:
+    post:
+      tags: [Cases]
+      summary: Add a document to a case
+      operationId: addDocument
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Updated case after document registration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cases/{caseId}/evaluations/qc:
+    post:
+      tags: [Cases]
+      summary: Evaluate QC rules for a case
+      operationId: evaluateQc
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateQcRequest'
+      responses:
+        '200':
+          description: Updated case after QC evaluation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cases/{caseId}/tasks/{taskId}/resolve:
+    post:
+      tags: [Cases]
+      summary: Resolve a case task explicitly
+      operationId: resolveTask
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+        - $ref: '#/components/parameters/taskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveTaskRequest'
+      responses:
+        '200':
+          description: Updated case after task resolution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cases/{caseId}/actions/start-monitoring:
+    post:
+      tags: [Monitoring]
+      summary: Start monitoring for a case
+      operationId: startMonitoring
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartMonitoringRequest'
+      responses:
+        '200':
+          description: Monitoring alert created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitoringAlert'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /governance/decisions:
+    post:
+      tags: [Governance]
+      summary: Create a governance decision record
+      operationId: createGovernanceDecision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGovernanceDecisionRequest'
+      responses:
+        '201':
+          description: Decision log created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionLog'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /cases/{caseId}/resolve:
+    post:
+      tags: [Cases]
+      summary: Resolve the default advisor-resolution task
+      operationId: resolveTaskAlias
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      responses:
+        '200':
+          description: Updated case after alias task resolution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cases/{caseId}/monitoring:
+    post:
+      tags: [Monitoring]
+      summary: Trigger the default live monitoring alert alias
+      operationId: startMonitoringAlias
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      responses:
+        '200':
+          description: Monitoring alert created from alias route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitoringAlert'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /governance/cases/{caseId}/decision:
+    post:
+      tags: [Governance]
+      summary: Create the default live console governance decision
+      operationId: createGovernanceDecisionAlias
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      responses:
+        '201':
+          description: Decision log created from alias route.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionLog'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cases/{caseId}/explainability:
+    get:
+      tags: [Governance]
+      summary: Get explainability details for a case decision
+      operationId: getExplainability
+      parameters:
+        - $ref: '#/components/parameters/caseId'
+      responses:
+        '200':
+          description: Explainability pack for the case.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplainabilityResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /activity/stream:
+    get:
+      tags: [Streaming]
+      summary: Subscribe to the platform activity stream
+      operationId: streamActivity
+      responses:
+        '200':
+          description: Server-sent event stream of activity updates.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                example: |
+                  event: activity
+                  data: {"id":"activity-001","title":"QC rerun completed"}
+components:
+  parameters:
+    caseId:
+      name: caseId
+      in: path
+      required: true
+      schema:
+        type: string
+    taskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    BadRequest:
+      description: Invalid request body or failed validation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    NotFound:
+      description: Requested resource was not found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+  schemas:
+    ProblemDetail:
+      type: object
+      required: [title, status, detail]
+      properties:
+        type:
+          type: string
+          format: uri
+          nullable: true
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+          nullable: true
+    CreateCaseRequest:
+      type: object
+      required: [clientId, caseName, jurisdiction]
+      properties:
+        clientId:
+          type: string
+        caseName:
+          type: string
+        jurisdiction:
+          type: string
+    CreateDocumentRequest:
+      type: object
+      required: [documentType, extractedFields]
+      properties:
+        documentType:
+          type: string
+        extractedFields:
+          type: array
+          items:
+            type: string
+    EvaluateQcRequest:
+      type: object
+      required: [actor]
+      properties:
+        actor:
+          type: string
+    ResolveTaskRequest:
+      type: object
+      required: [actor, note]
+      properties:
+        actor:
+          type: string
+        note:
+          type: string
+    StartMonitoringRequest:
+      type: object
+      required: [title, severity, description, falsePositiveRisk]
+      properties:
+        title:
+          type: string
+        severity:
+          $ref: '#/components/schemas/Severity'
+        description:
+          type: string
+        falsePositiveRisk:
+          type: integer
+          minimum: 0
+          maximum: 100
+    CreateGovernanceDecisionRequest:
+      type: object
+      required: [caseId, title, actor, decision, confidence, reasoningChain]
+      properties:
+        caseId:
+          type: string
+        title:
+          type: string
+        actor:
+          type: string
+        decision:
+          $ref: '#/components/schemas/GovernanceDecision'
+        confidence:
+          type: integer
+          minimum: 0
+          maximum: 100
+        overrideReason:
+          type: string
+          nullable: true
+        reasoningChain:
+          type: array
+          items:
+            type: string
+          minItems: 1
+    CheckKycRequest:
+      type: object
+      required:
+        - brandName
+        - formTitle
+        - companyInfo
+        - primaryContact
+        - addresses
+        - bankingProfile
+        - beneficialOwners
+        - documents
+        - declarations
+      properties:
+        brandName:
+          type: string
+        formTitle:
+          type: string
+        companyInfo:
+          $ref: '#/components/schemas/CompanyInfo'
+        primaryContact:
+          $ref: '#/components/schemas/PrimaryContact'
+        addresses:
+          $ref: '#/components/schemas/Addresses'
+        bankingProfile:
+          $ref: '#/components/schemas/BankingProfile'
+        beneficialOwners:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BeneficialOwner'
+        documents:
+          $ref: '#/components/schemas/Documents'
+        declarations:
+          $ref: '#/components/schemas/Declarations'
+        additionalNotes:
+          type: string
+          nullable: true
+    CompanyInfo:
+      type: object
+      required:
+        - legalName
+        - entityType
+        - registrationNumber
+        - taxId
+        - incorporationDate
+        - incorporationState
+        - incorporationCountry
+        - industry
+        - website
+        - annualRevenue
+        - employeeCount
+      properties:
+        legalName:
+          type: string
+        tradingName:
+          type: string
+          nullable: true
+        entityType:
+          type: string
+        registrationNumber:
+          type: string
+        taxId:
+          type: string
+        incorporationDate:
+          type: string
+        incorporationState:
+          type: string
+        incorporationCountry:
+          type: string
+        industry:
+          type: string
+        website:
+          type: string
+        annualRevenue:
+          type: string
+        employeeCount:
+          type: string
+    PrimaryContact:
+      type: object
+      required: [fullName, title, email, phone]
+      properties:
+        fullName:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        extension:
+          type: string
+          nullable: true
+    Addresses:
+      type: object
+      required:
+        - registeredLine1
+        - city
+        - state
+        - postalCode
+        - country
+        - operatingSameAsRegistered
+        - operatingCountry
+      properties:
+        registeredLine1:
+          type: string
+        registeredLine2:
+          type: string
+          nullable: true
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+        operatingSameAsRegistered:
+          type: boolean
+        operatingLine1:
+          type: string
+          nullable: true
+        operatingLine2:
+          type: string
+          nullable: true
+        operatingCity:
+          type: string
+          nullable: true
+        operatingState:
+          type: string
+          nullable: true
+        operatingPostalCode:
+          type: string
+          nullable: true
+        operatingCountry:
+          type: string
+    BankingProfile:
+      type: object
+      required:
+        - accountPurpose
+        - requestedProducts
+        - expectedOpeningDeposit
+        - monthlyIncoming
+        - monthlyOutgoing
+        - onlineBankingUsers
+        - internationalActivity
+        - needsCommercialCards
+      properties:
+        accountPurpose:
+          type: string
+        requestedProducts:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        expectedOpeningDeposit:
+          type: string
+        monthlyIncoming:
+          type: string
+        monthlyOutgoing:
+          type: string
+        onlineBankingUsers:
+          type: string
+        internationalActivity:
+          type: boolean
+        jurisdictionsInScope:
+          type: string
+          nullable: true
+        needsCommercialCards:
+          type: boolean
+    BeneficialOwner:
+      type: object
+      required: [id, fullName, title, ownershipPercentage, email, phone, isAuthorizedSigner]
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        title:
+          type: string
+        ownershipPercentage:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        isAuthorizedSigner:
+          type: boolean
+    Documents:
+      type: object
+      required:
+        - certificateOfFormation
+        - taxIdLetter
+        - ownershipChart
+        - boardResolution
+        - signerIdentification
+        - addressProof
+      properties:
+        certificateOfFormation:
+          type: boolean
+        taxIdLetter:
+          type: boolean
+        ownershipChart:
+          type: boolean
+        boardResolution:
+          type: boolean
+        signerIdentification:
+          type: boolean
+        addressProof:
+          type: boolean
+    Declarations:
+      type: object
+      required:
+        - certifyAuthority
+        - certifyBeneficialOwners
+        - confirmTaxCompliance
+        - confirmTerms
+      properties:
+        certifyAuthority:
+          type: boolean
+        certifyBeneficialOwners:
+          type: boolean
+        confirmTaxCompliance:
+          type: boolean
+        confirmTerms:
+          type: boolean
+    Severity:
+      type: string
+      enum: [info, success, warning, critical]
+    GovernanceDecision:
+      type: string
+      enum: [approved, escalated, overridden, flagged]
+    CasePriority:
+      type: string
+      enum: [high, medium, low]
+    CaseStatus:
+      type: string
+      enum: [in_flight, exception, resolved, monitored]
+    PolicyCheckStatus:
+      type: string
+      enum: [passed, failed, manual_review]
+    DashboardRoute:
+      type: string
+      enum: [executive, agents, cases, monitoring, governance]
+    CheckKycResponse:
+      type: object
+      required: [status, message, checkedAt]
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        checkedAt:
+          type: string
+          format: date-time
+    PlatformSnapshotResponse:
+      type: object
+      required:
+        - clients
+        - cases
+        - timeline
+        - kpis
+        - regionPerformance
+        - trendSeries
+        - donutSlices
+        - agents
+        - activityFeed
+        - confidenceMatrix
+        - taskThroughput
+        - alerts
+        - falsePositiveGauge
+        - riskHistogram
+        - decisionLogs
+        - fairnessSeries
+        - humanOverrideRate
+        - demo
+      properties:
+        clients:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientRecord'
+        cases:
+          type: array
+          items:
+            $ref: '#/components/schemas/CaseRecord'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        kpis:
+          type: array
+          items:
+            $ref: '#/components/schemas/KpiMetric'
+        regionPerformance:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegionPerformance'
+        trendSeries:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrendPoint'
+        donutSlices:
+          type: array
+          items:
+            $ref: '#/components/schemas/DonutSlice'
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentRecord'
+        activityFeed:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityItem'
+        confidenceMatrix:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfidenceCell'
+        taskThroughput:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskThroughputPoint'
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonitoringAlert'
+        falsePositiveGauge:
+          type: integer
+        riskHistogram:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistogramPoint'
+        decisionLogs:
+          type: array
+          items:
+            $ref: '#/components/schemas/DecisionLog'
+        fairnessSeries:
+          type: array
+          items:
+            $ref: '#/components/schemas/FairnessPoint'
+        humanOverrideRate:
+          type: number
+        demo:
+          $ref: '#/components/schemas/DemoSnapshot'
+    ClientRecord:
+      type: object
+      required: [id, name, segment, headquarters, region, coordinates, sector, annualRevenueUsd]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        segment:
+          type: string
+        headquarters:
+          type: string
+        region:
+          type: string
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+        sector:
+          type: string
+        annualRevenueUsd:
+          type: integer
+          format: int64
+    KpiMetric:
+      type: object
+      required: [id, label, value, displayValue, trend, narrative]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        value:
+          type: number
+        displayValue:
+          type: string
+        delta:
+          type: number
+          nullable: true
+        deltaLabel:
+          type: string
+          nullable: true
+        trend:
+          type: string
+        narrative:
+          type: string
+        route:
+          $ref: '#/components/schemas/DashboardRoute'
+    RegionPerformance:
+      type: object
+      required: [id, label, performance, stpRate, bubbleValue, centroid]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        performance:
+          type: number
+        stpRate:
+          type: number
+        bubbleValue:
+          type: integer
+        centroid:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+    TrendPoint:
+      type: object
+      required: [month, nigo, stp]
+      properties:
+        month:
+          type: string
+        nigo:
+          type: integer
+        stp:
+          type: integer
+    DonutSlice:
+      type: object
+      required: [name, value, color]
+      properties:
+        name:
+          type: string
+        value:
+          type: integer
+        color:
+          type: string
+    AgentRecord:
+      type: object
+      required: [id, name, role, status, latencyMs, tasksProcessed, autoShare, manualShare, pulseMessage]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        latencyMs:
+          type: integer
+        tasksProcessed:
+          type: integer
+        autoShare:
+          type: integer
+        manualShare:
+          type: integer
+        pulseMessage:
+          type: string
+    ActivityItem:
+      type: object
+      required: [id, title, description, timestamp, severity, routeHint]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        severity:
+          $ref: '#/components/schemas/Severity'
+        routeHint:
+          $ref: '#/components/schemas/DashboardRoute'
+    ConfidenceCell:
+      type: object
+      required: [docType, field, confidence]
+      properties:
+        docType:
+          type: string
+        field:
+          type: string
+        confidence:
+          type: integer
+    TaskThroughputPoint:
+      type: object
+      required: [agent, tasks, auto, manual]
+      properties:
+        agent:
+          type: string
+        tasks:
+          type: integer
+        auto:
+          type: integer
+        manual:
+          type: integer
+    MonitoringAlert:
+      type: object
+      required:
+        - id
+        - caseId
+        - clientId
+        - title
+        - severity
+        - region
+        - coordinates
+        - eventTime
+        - falsePositiveRisk
+        - description
+      properties:
+        id:
+          type: string
+        caseId:
+          type: string
+        clientId:
+          type: string
+        title:
+          type: string
+        severity:
+          $ref: '#/components/schemas/Severity'
+        region:
+          type: string
+        coordinates:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: number
+        eventTime:
+          type: string
+          format: date-time
+        falsePositiveRisk:
+          type: integer
+        description:
+          type: string
+    HistogramPoint:
+      type: object
+      required: [bucket, count]
+      properties:
+        bucket:
+          type: string
+        count:
+          type: integer
+    DecisionLog:
+      type: object
+      required:
+        - id
+        - caseId
+        - title
+        - actor
+        - decision
+        - confidence
+        - createdAt
+        - reasoningChain
+        - sources
+      properties:
+        id:
+          type: string
+        caseId:
+          type: string
+        title:
+          type: string
+        actor:
+          type: string
+        decision:
+          $ref: '#/components/schemas/GovernanceDecision'
+        confidence:
+          type: integer
+        overrideReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        reasoningChain:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/DecisionEvidence'
+    DecisionEvidence:
+      type: object
+      required: [id, label, type, confidence, excerpt]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        confidence:
+          type: integer
+        excerpt:
+          type: string
+    FairnessPoint:
+      type: object
+      required: [cohort, parity, overrides]
+      properties:
+        cohort:
+          type: string
+        parity:
+          type: number
+        overrides:
+          type: integer
+    DemoSnapshot:
+      type: object
+      required: [enabled, timeline, currentStep]
+      properties:
+        enabled:
+          type: boolean
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        currentStep:
+          type: integer
+    TimelineEvent:
+      type: object
+      required:
+        - id
+        - timeOffsetMs
+        - timestamp
+        - type
+        - title
+        - description
+        - severity
+        - caseId
+        - clientId
+        - routeHint
+      properties:
+        id:
+          type: string
+        timeOffsetMs:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          $ref: '#/components/schemas/Severity'
+        caseId:
+          type: string
+        clientId:
+          type: string
+        routeHint:
+          $ref: '#/components/schemas/DashboardRoute'
+    CaseRecord:
+      type: object
+      required:
+        - id
+        - clientId
+        - caseName
+        - priority
+        - stage
+        - status
+        - jurisdiction
+        - region
+        - riskScore
+        - stpEligible
+        - firstTimeRight
+        - onboardingHours
+        - assignedTo
+        - completeness
+        - documents
+        - qcRules
+        - narrative
+        - nextBestAction
+        - ownershipGraph
+      properties:
+        id:
+          type: string
+        clientId:
+          type: string
+        caseName:
+          type: string
+        priority:
+          $ref: '#/components/schemas/CasePriority'
+        stage:
+          type: string
+          description: Persisted stage string emitted by the platform.
+        status:
+          $ref: '#/components/schemas/CaseStatus'
+        jurisdiction:
+          type: string
+        region:
+          type: string
+        riskScore:
+          type: integer
+        stpEligible:
+          type: boolean
+        firstTimeRight:
+          type: boolean
+        onboardingHours:
+          type: number
+        assignedTo:
+          type: string
+        completeness:
+          type: integer
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSubmission'
+        qcRules:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolicyCheckResult'
+        narrative:
+          type: string
+        nextBestAction:
+          type: string
+        ownershipGraph:
+          $ref: '#/components/schemas/OwnershipGraph'
+    DocumentSubmission:
+      type: object
+      required: [id, type, status, completeness, uploadedAt, extractedFields]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+        completeness:
+          type: integer
+        uploadedAt:
+          type: string
+          format: date-time
+        extractedFields:
+          type: array
+          items:
+            type: string
+    PolicyCheckResult:
+      type: object
+      required: [id, label, status, rationale]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        status:
+          $ref: '#/components/schemas/PolicyCheckStatus'
+        rationale:
+          type: string
+    OwnershipGraph:
+      type: object
+      required: [nodes, links]
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/OwnershipParty'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/OwnershipRelationship'
+    OwnershipParty:
+      type: object
+      required: [id, name, role, group]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        group:
+          type: string
+    OwnershipRelationship:
+      type: object
+      required: [source, target, weight]
+      properties:
+        source:
+          type: string
+        target:
+          type: string
+        weight:
+          type: integer
+    ExplainabilityResponse:
+      type: object
+      required: [caseId, decision]
+      properties:
+        caseId:
+          type: string
+        decision:
+          $ref: '#/components/schemas/DecisionLog'

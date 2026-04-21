@@ -1,0 +1,809 @@
+openapi: 3.0.3
+info:
+  title: Commercial Account Opening API
+  version: 1.0.0
+  description: >
+    Swagger/OpenAPI contract for the Node.js API that supports the commercial
+    account opening application and its local screening integrations.
+servers:
+  - url: http://localhost:8080
+    description: Local Node API
+tags:
+  - name: Health
+  - name: Workspace
+  - name: Screening
+paths:
+  /api/account-opening/health:
+    get:
+      tags: [Health]
+      summary: Check API health
+      operationId: getAccountOpeningHealth
+      responses:
+        '200':
+          description: Health status for the Node API.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/account-opening/workspace:
+    get:
+      tags: [Workspace]
+      summary: Load the current account opening workspace draft
+      operationId: loadWorkspace
+      responses:
+        '200':
+          description: Current workspace state stored in SQLite.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceState'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags: [Workspace]
+      summary: Save the current account opening workspace draft
+      operationId: saveWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceDraft'
+      responses:
+        '200':
+          description: Saved workspace state with refreshed timestamps.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceState'
+        '500':
+          $ref: '#/components/responses/InvalidJson'
+  /api/account-opening/submit:
+    post:
+      tags: [Workspace]
+      summary: Submit the current workspace for orchestration
+      operationId: submitWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceDraft'
+      responses:
+        '200':
+          description: Submitted workspace enriched with submission and orchestration results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkspaceState'
+        '400':
+          description: Submission failed validation or KYC review.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResponse'
+                  - $ref: '#/components/schemas/KycFailureResponse'
+        '500':
+          $ref: '#/components/responses/InvalidJson'
+  /api/checkKYC:
+    post:
+      tags: [Screening]
+      summary: Execute the local CheckKYC contract directly
+      operationId: processCheckKycRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckKycRequest'
+      responses:
+        '200':
+          description: Local CheckKYC contract result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckKycContractResponse'
+        '500':
+          $ref: '#/components/responses/InvalidJson'
+  /api/check-kyc/applications:
+    post:
+      tags: [Screening]
+      summary: Build and submit a CheckKYC application from a workspace draft
+      operationId: submitCheckKycApplication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceDraft'
+      responses:
+        '200':
+          description: Wrapped CheckKYC request and response details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckKycApplicationResult'
+        '500':
+          $ref: '#/components/responses/InvalidJson'
+  /api/check-risk/applications:
+    post:
+      tags: [Screening]
+      summary: Build and submit a checkRisk application from a workspace draft
+      operationId: submitCheckRiskApplication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkspaceDraft'
+      responses:
+        '200':
+          description: Derived or provider-backed checkRisk result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckRiskResponse'
+        '500':
+          $ref: '#/components/responses/InvalidJson'
+components:
+  responses:
+    InvalidJson:
+      description: The API could not parse the JSON request body.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Invalid JSON payload.
+    InternalServerError:
+      description: Unexpected server-side failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Unexpected server error.
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service, storage]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: commercial-account-opening-node-api
+        storage:
+          type: string
+          example: sqlite
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+    ValidationIssue:
+      type: object
+      required: [fieldKey, message]
+      properties:
+        fieldKey:
+          type: string
+        message:
+          type: string
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            issues:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValidationIssue'
+    KycFailureResponse:
+      allOf:
+        - $ref: '#/components/schemas/ValidationErrorResponse'
+        - type: object
+          properties:
+            integration:
+              type: object
+              description: Captured upstream KYC integration payload on failure.
+              additionalProperties: true
+    Step:
+      type: object
+      required: [id, label, eyebrow, title, detail]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        eyebrow:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+    DocumentOption:
+      type: object
+      required: [key, title, detail]
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+    DeclarationOption:
+      type: object
+      required: [key, title, detail, required]
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        required:
+          type: boolean
+    CompanyInfo:
+      type: object
+      required:
+        - legalName
+        - tradingName
+        - entityType
+        - registrationNumber
+        - taxId
+        - incorporationDate
+        - incorporationState
+        - incorporationCountry
+        - industry
+        - website
+        - annualRevenue
+        - employeeCount
+      properties:
+        legalName:
+          type: string
+        tradingName:
+          type: string
+        entityType:
+          type: string
+        registrationNumber:
+          type: string
+        taxId:
+          type: string
+        incorporationDate:
+          type: string
+          format: date
+        incorporationState:
+          type: string
+        incorporationCountry:
+          type: string
+        industry:
+          type: string
+        website:
+          type: string
+        annualRevenue:
+          type: string
+        employeeCount:
+          type: string
+    PrimaryContact:
+      type: object
+      required: [fullName, title, email, phone, extension]
+      properties:
+        fullName:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        extension:
+          type: string
+    Addresses:
+      type: object
+      required:
+        - registeredLine1
+        - registeredLine2
+        - city
+        - state
+        - postalCode
+        - country
+        - operatingSameAsRegistered
+        - operatingLine1
+        - operatingLine2
+        - operatingCity
+        - operatingState
+        - operatingPostalCode
+        - operatingCountry
+      properties:
+        registeredLine1:
+          type: string
+        registeredLine2:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+        operatingSameAsRegistered:
+          type: boolean
+        operatingLine1:
+          type: string
+        operatingLine2:
+          type: string
+        operatingCity:
+          type: string
+        operatingState:
+          type: string
+        operatingPostalCode:
+          type: string
+        operatingCountry:
+          type: string
+    BankingProfile:
+      type: object
+      required:
+        - accountPurpose
+        - requestedProducts
+        - expectedOpeningDeposit
+        - monthlyIncoming
+        - monthlyOutgoing
+        - onlineBankingUsers
+        - internationalActivity
+        - jurisdictionsInScope
+        - needsCommercialCards
+      properties:
+        accountPurpose:
+          type: string
+        requestedProducts:
+          type: array
+          items:
+            type: string
+        expectedOpeningDeposit:
+          type: string
+        monthlyIncoming:
+          type: string
+        monthlyOutgoing:
+          type: string
+        onlineBankingUsers:
+          type: string
+        internationalActivity:
+          type: boolean
+        jurisdictionsInScope:
+          type: string
+        needsCommercialCards:
+          type: boolean
+    BeneficialOwner:
+      type: object
+      required:
+        - id
+        - fullName
+        - title
+        - ownershipPercentage
+        - email
+        - phone
+        - isAuthorizedSigner
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        title:
+          type: string
+        ownershipPercentage:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        isAuthorizedSigner:
+          type: boolean
+    Documents:
+      type: object
+      required:
+        - certificateOfFormation
+        - taxIdLetter
+        - ownershipChart
+        - boardResolution
+        - signerIdentification
+        - addressProof
+      properties:
+        certificateOfFormation:
+          type: boolean
+        taxIdLetter:
+          type: boolean
+        ownershipChart:
+          type: boolean
+        boardResolution:
+          type: boolean
+        signerIdentification:
+          type: boolean
+        addressProof:
+          type: boolean
+    Declarations:
+      type: object
+      required:
+        - certifyAuthority
+        - certifyBeneficialOwners
+        - confirmTaxCompliance
+        - confirmTerms
+      properties:
+        certifyAuthority:
+          type: boolean
+        certifyBeneficialOwners:
+          type: boolean
+        confirmTaxCompliance:
+          type: boolean
+        confirmTerms:
+          type: boolean
+    SubmissionState:
+      type: object
+      required:
+        - status
+        - referenceId
+        - submittedAt
+        - overallDecision
+        - summary
+        - recommendedAction
+      properties:
+        status:
+          type: string
+          enum: [draft, submitted]
+        referenceId:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+          nullable: true
+        overallDecision:
+          type: string
+        summary:
+          type: string
+        recommendedAction:
+          type: string
+    CheckResult:
+      type: object
+      required: [key, label, status, decision, summary, flags]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+        decision:
+          type: string
+        summary:
+          type: string
+        flags:
+          type: array
+          items:
+            type: string
+        score:
+          type: number
+          nullable: true
+        integration:
+          type: object
+          nullable: true
+          additionalProperties: true
+    OrchestrationState:
+      type: object
+      required: [status, startedAt, completedAt, summary, checks]
+      properties:
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        summary:
+          type: string
+        checks:
+          type: object
+          required: [kyc, aml, documentProcessing, risk]
+          properties:
+            kyc:
+              $ref: '#/components/schemas/CheckResult'
+            aml:
+              $ref: '#/components/schemas/CheckResult'
+            documentProcessing:
+              $ref: '#/components/schemas/CheckResult'
+            risk:
+              $ref: '#/components/schemas/CheckResult'
+        integrations:
+          type: object
+          nullable: true
+          additionalProperties: true
+    WorkspaceDraft:
+      type: object
+      required:
+        - brandName
+        - formTitle
+        - intro
+        - activeStep
+        - supportEmail
+        - steps
+        - entityTypeOptions
+        - industryOptions
+        - countryOptions
+        - stateOptions
+        - productOptions
+        - documentOptions
+        - declarationOptions
+        - companyInfo
+        - primaryContact
+        - addresses
+        - bankingProfile
+        - beneficialOwners
+        - documents
+        - declarations
+        - additionalNotes
+        - submission
+        - orchestration
+      properties:
+        brandName:
+          type: string
+        formTitle:
+          type: string
+        intro:
+          type: string
+        activeStep:
+          type: string
+        supportEmail:
+          type: string
+          format: email
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/Step'
+        entityTypeOptions:
+          type: array
+          items:
+            type: string
+        industryOptions:
+          type: array
+          items:
+            type: string
+        countryOptions:
+          type: array
+          items:
+            type: string
+        stateOptions:
+          type: array
+          items:
+            type: string
+        productOptions:
+          type: array
+          items:
+            type: string
+        documentOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentOption'
+        declarationOptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeclarationOption'
+        companyInfo:
+          $ref: '#/components/schemas/CompanyInfo'
+        primaryContact:
+          $ref: '#/components/schemas/PrimaryContact'
+        addresses:
+          $ref: '#/components/schemas/Addresses'
+        bankingProfile:
+          $ref: '#/components/schemas/BankingProfile'
+        beneficialOwners:
+          type: array
+          items:
+            $ref: '#/components/schemas/BeneficialOwner'
+        documents:
+          $ref: '#/components/schemas/Documents'
+        declarations:
+          $ref: '#/components/schemas/Declarations'
+        additionalNotes:
+          type: string
+        submission:
+          $ref: '#/components/schemas/SubmissionState'
+        orchestration:
+          $ref: '#/components/schemas/OrchestrationState'
+    WorkspaceState:
+      allOf:
+        - $ref: '#/components/schemas/WorkspaceDraft'
+        - type: object
+          properties:
+            lastUpdatedAt:
+              type: string
+              format: date-time
+              nullable: true
+    CheckKycRequest:
+      type: object
+      required:
+        - brandName
+        - formTitle
+        - companyInfo
+        - primaryContact
+        - addresses
+        - bankingProfile
+        - beneficialOwners
+        - documents
+        - declarations
+      properties:
+        brandName:
+          type: string
+        formTitle:
+          type: string
+        companyInfo:
+          $ref: '#/components/schemas/CompanyInfo'
+        primaryContact:
+          $ref: '#/components/schemas/PrimaryContact'
+        addresses:
+          $ref: '#/components/schemas/Addresses'
+        bankingProfile:
+          $ref: '#/components/schemas/BankingProfile'
+        beneficialOwners:
+          type: array
+          items:
+            $ref: '#/components/schemas/BeneficialOwner'
+        documents:
+          $ref: '#/components/schemas/Documents'
+        declarations:
+          $ref: '#/components/schemas/Declarations'
+        additionalNotes:
+          type: string
+    CheckKycContractResponse:
+      type: object
+      required: [status, message, checkedAt, missingFields]
+      properties:
+        status:
+          type: string
+          enum: [pass, fail]
+        message:
+          type: string
+        checkedAt:
+          type: string
+          format: date-time
+        missingFields:
+          type: array
+          items:
+            type: string
+    CheckKycApplicationResult:
+      type: object
+      required: [request, response]
+      properties:
+        request:
+          $ref: '#/components/schemas/CheckKycRequest'
+        response:
+          type: object
+          required:
+            - response
+            - provider
+            - endpoint
+            - externalApplicationId
+            - receivedAt
+            - transmissionMode
+            - message
+            - missingFields
+            - raw
+          properties:
+            response:
+              type: string
+              enum: [Success, Failed]
+            provider:
+              type: string
+            endpoint:
+              type: string
+            externalApplicationId:
+              type: string
+            receivedAt:
+              type: string
+              format: date-time
+            transmissionMode:
+              type: string
+              enum: [local, live]
+            errorMessage:
+              type: string
+              nullable: true
+            message:
+              type: string
+            missingFields:
+              type: array
+              items:
+                type: string
+            raw:
+              type: object
+              additionalProperties: true
+    CheckRiskDocument:
+      type: object
+      required: [key, title, detail, ready]
+      properties:
+        key:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        ready:
+          type: boolean
+    CheckRiskPayload:
+      type: object
+      required:
+        - sourceSystem
+        - submittedAt
+        - applicant
+        - primaryContact
+        - bankingProfile
+        - beneficialOwners
+        - documents
+      properties:
+        sourceSystem:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        applicant:
+          type: object
+          required:
+            - legalName
+            - entityType
+            - registrationNumber
+            - taxId
+            - incorporationCountry
+            - industry
+            - annualRevenue
+            - employeeCount
+          properties:
+            legalName:
+              type: string
+            entityType:
+              type: string
+            registrationNumber:
+              type: string
+            taxId:
+              type: string
+            incorporationCountry:
+              type: string
+            industry:
+              type: string
+            annualRevenue:
+              type: string
+            employeeCount:
+              type: string
+        primaryContact:
+          type: object
+          required: [fullName, email, phone]
+          properties:
+            fullName:
+              type: string
+            email:
+              type: string
+              format: email
+            phone:
+              type: string
+        bankingProfile:
+          $ref: '#/components/schemas/BankingProfile'
+        beneficialOwners:
+          type: array
+          items:
+            $ref: '#/components/schemas/BeneficialOwner'
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/CheckRiskDocument'
+    CheckRiskResponse:
+      type: object
+      required: [risk]
+      properties:
+        risk:
+          type: string
+          enum: [Low, Moderate, High]
