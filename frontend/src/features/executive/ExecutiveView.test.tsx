@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { ExecutiveView } from '@/features/executive/ExecutiveView';
+import { routeCatalog } from '@/services/selectors';
 import { usePlatformStore } from '@/store';
 import { renderWithProviders, screen } from '@/test/test-utils';
 
@@ -42,6 +43,6 @@ describe('ExecutiveView', () => {
 
     await user.click(screen.getByRole('button', { name: new RegExp(metric.label, 'i') }));
 
-    expect(navigateMock).toHaveBeenCalledWith(`/${metric.route}`);
+    expect(navigateMock).toHaveBeenCalledWith(routeCatalog[metric.route].path);
   });
 });

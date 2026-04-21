@@ -50,10 +50,10 @@ describe('CasesView', () => {
     });
 
     renderWithProviders(
-      <MemoryRouter initialEntries={['/cases']}>
+      <MemoryRouter initialEntries={['/kyc-fabric/cases']}>
         <Routes>
-          <Route path="/cases" element={<CasesView />} />
-          <Route path="/governance" element={<div>Governance destination</div>} />
+          <Route path="/kyc-fabric/cases" element={<CasesView />} />
+          <Route path="/kyc-fabric/governance" element={<div>Governance destination</div>} />
         </Routes>
       </MemoryRouter>,
     );
