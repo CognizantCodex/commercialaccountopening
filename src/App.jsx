@@ -1,5 +1,10 @@
 import { startTransition, useEffect, useId, useRef, useState } from "react";
-import { loadWorkspace, saveWorkspace, submitWorkspace } from "./api";
+import {
+  listWorkspaceDrafts,
+  loadWorkspace,
+  saveWorkspace,
+  submitWorkspace,
+} from "./api";
 import { defaultWorkspace } from "./defaultWorkspace";
 
 const PHONE_DIGIT_LIMIT = 10;
@@ -42,6 +47,70 @@ function isEmbeddedApplicationRoute(pathname = "/") {
   );
 }
 
+function getRequestedDraftId() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return new URLSearchParams(window.location.search).get("draft") ?? "";
+}
+
+function getCurrentView() {
+  if (typeof window === "undefined") {
+    return "form";
+  }
+
+  return new URLSearchParams(window.location.search).get("view") === "drafts"
+    ? "drafts"
+    : "form";
+}
+
+function isReloadNavigation() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const navigationEntries = window.performance?.getEntriesByType?.("navigation");
+  return navigationEntries?.[0]?.type === "reload";
+}
+
+function buildDraftPath(pathname, draftId) {
+  if (!draftId) {
+    return pathname;
+  }
+
+  return `${pathname}?${new URLSearchParams({ draft: draftId }).toString()}`;
+}
+
+function buildDraftBrowserPath(pathname) {
+  return `${pathname}?${new URLSearchParams({ view: "drafts" }).toString()}`;
+}
+
+function syncDraftUrl(pathname, draftId) {
+  if (!draftId || typeof window === "undefined") {
+    return;
+  }
+
+  const nextUrl = new URL(window.location.href);
+  nextUrl.pathname = pathname;
+  nextUrl.search = "";
+  nextUrl.searchParams.set("draft", draftId);
+  nextUrl.hash = "";
+  window.history.replaceState({}, "", nextUrl);
+}
+
+function resetToDefaultUrl(pathname) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const nextUrl = new URL(window.location.href);
+  nextUrl.pathname = pathname;
+  nextUrl.search = "";
+  nextUrl.hash = "";
+  window.history.replaceState({}, "", nextUrl);
+}
+
 function createOwner(id = `owner-${Date.now()}`) {
   return {
     id,
@@ -52,6 +121,30 @@ function createOwner(id = `owner-${Date.now()}`) {
     phone: "",
     isAuthorizedSigner: false,
   };
+}
+
+function formatFileSize(sizeInBytes) {
+  const size = Number(sizeInBytes ?? 0);
+
+  if (!size) {
+    return "0 KB";
+  }
+
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("File upload failed."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function sanitizeDigits(value, maxLength) {
@@ -237,6 +330,10 @@ function mergeWorkspace(candidate = {}) {
     documents: {
       ...defaultWorkspace.documents,
       ...(candidate.documents ?? {}),
+    },
+    documentFiles: {
+      ...defaultWorkspace.documentFiles,
+      ...(candidate.documentFiles ?? {}),
     },
     declarations: {
       ...defaultWorkspace.declarations,
@@ -694,8 +791,22 @@ function buildValidationErrors(workspace) {
       "Select at least one beneficial owner as an authorized signer.";
   }
 
+  workspace.documentOptions.forEach((document) => {
+    if (workspace.documents?.[document.key] && !workspace.documentFiles?.[document.key]) {
+      errors[`documents.${document.key}`] = `Add the ${document.title.toLowerCase()} file.`;
+    }
+  });
+
   if (Object.values(workspace.documents ?? {}).filter(Boolean).length < 3) {
     errors.documents = "Mark at least three supporting documents as ready.";
+  } else if (
+    workspace.documentOptions.some(
+      (document) =>
+        workspace.documents?.[document.key] && !workspace.documentFiles?.[document.key],
+    )
+  ) {
+    errors.documents =
+      "Add a file for every supporting document that is marked as ready.";
   }
 
   workspace.declarationOptions.forEach((declaration) => {
@@ -1070,6 +1181,52 @@ function OptionCard({ title, detail, checked, onChange }) {
   );
 }
 
+function DocumentUploadCard({
+  title,
+  detail,
+  checked,
+  file,
+  error = "",
+  onToggle,
+  onFileSelect,
+  onRemove,
+}) {
+  return (
+    <div className={`document-card${checked ? " checked" : ""}`}>
+      <OptionCard
+        title={title}
+        detail={detail}
+        checked={checked}
+        onChange={onToggle}
+      />
+      <div className="document-card-actions">
+        <label className="secondary-button document-upload-button">
+          <input type="file" hidden onChange={onFileSelect} />
+          <span>{file ? "Replace document" : "Add document"}</span>
+        </label>
+        {file ? (
+          <>
+            <div className="document-file-pill">
+              <strong>{file.name}</strong>
+              <small>{formatFileSize(file.size)}</small>
+            </div>
+            <button
+              type="button"
+              className="ghost-button document-remove-button"
+              onClick={onRemove}
+            >
+              Remove
+            </button>
+          </>
+        ) : (
+          <p className="document-card-copy">No file saved yet.</p>
+        )}
+      </div>
+      {error ? <small className="field-error-copy">{error}</small> : null}
+    </div>
+  );
+}
+
 function OwnerCard({
   owner,
   index,
@@ -1170,15 +1327,17 @@ function OwnerCard({
 function App() {
   const currentPathname =
     typeof window === "undefined" ? "/" : window.location.pathname;
+  const shouldResetOnRefresh = isReloadNavigation();
+  const currentView = shouldResetOnRefresh ? "form" : getCurrentView();
   const embeddedApplicationRoute = isEmbeddedApplicationRoute(currentPathname);
   const kycFabricContext = embeddedApplicationRoute
     ? { isKycFabricExperience: false, routeLabel: "Application" }
     : getKycFabricContext(currentPathname);
-  const customerAccountOpeningUrl = currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
-    ? KYC_FABRIC_APPLICATION_PATH
-    : "/";
+  const requestedDraftId = shouldResetOnRefresh ? "" : getRequestedDraftId();
   const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
+  const [drafts, setDrafts] = useState([]);
+  const [draftListState, setDraftListState] = useState("idle");
   const [connectionState, setConnectionState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
   const [submitState, setSubmitState] = useState("idle");
@@ -1194,30 +1353,58 @@ function App() {
     let ignore = false;
 
     async function bootstrapWorkspace() {
+      setDraftListState("loading");
       setWorkspace({
         ...mergeWorkspace(defaultWorkspace),
         activeStep: defaultWorkspace.activeStep,
       });
 
+      if (shouldResetOnRefresh) {
+        resetToDefaultUrl(currentPathname);
+      }
+
       try {
-        await loadWorkspace();
+        const draftResponse = await listWorkspaceDrafts();
         if (ignore) {
           return;
         }
 
+        setDrafts(draftResponse.drafts ?? []);
+        setDraftListState("loaded");
+
+        if (requestedDraftId) {
+          const loadedWorkspace = await loadWorkspace(requestedDraftId);
+          if (ignore) {
+            return;
+          }
+
+          setWorkspace(
+            mergeWorkspace({
+              ...loadedWorkspace,
+              activeStep: defaultWorkspace.activeStep,
+            }),
+          );
+          syncDraftUrl(currentPathname, loadedWorkspace.draftId);
+        }
+
         setConnectionState("connected");
         setStatusMessage(
-          "Secure application workspace connected. Start with a fresh onboarding form.",
+          requestedDraftId
+            ? "Saved draft retrieved. You can continue editing the corporate account opening application."
+            : "Draft mode is ready. Start a new application at step 1 or select an existing draft.",
         );
         setHasBootstrapped(true);
-      } catch {
+      } catch (error) {
         if (ignore) {
           return;
         }
 
         setConnectionState("fallback");
+        setDraftListState("error");
         setStatusMessage(
-          "The form is starting fresh while the application workspace is unreachable.",
+          error?.payload?.code === "draft_not_found"
+            ? "The requested draft link could not be found. A fresh application has been opened instead."
+            : "The form is starting fresh while the application workspace is unreachable.",
         );
         setHasBootstrapped(true);
       }
@@ -1228,7 +1415,16 @@ function App() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [currentPathname, requestedDraftId, shouldResetOnRefresh]);
+
+  const draftBrowserUrl = buildDraftBrowserPath(currentPathname);
+  const customerAccountOpeningUrl = buildDraftPath(
+    currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
+      ? KYC_FABRIC_APPLICATION_PATH
+      : "/",
+    workspace.draftId,
+  );
+  const latestDraft = drafts[0] ?? null;
 
   const currentStep =
     workspace.steps.find((step) => step.id === workspace.activeStep) ??
@@ -1607,6 +1803,46 @@ function App() {
     };
   }
 
+  async function refreshDraftList() {
+    try {
+      const draftResponse = await listWorkspaceDrafts();
+      setDrafts(draftResponse.drafts ?? []);
+      setDraftListState("loaded");
+    } catch {
+      setDraftListState("error");
+    }
+  }
+
+  async function handleRetrieveDraft(draftId) {
+    setStatusMessage("Retrieving the selected draft...");
+
+    try {
+      const loadedWorkspace = await loadWorkspace(draftId);
+      const mergedWorkspace = mergeWorkspace({
+        ...loadedWorkspace,
+        activeStep: defaultWorkspace.activeStep,
+      });
+
+      setWorkspace(mergedWorkspace);
+      setConnectionState("connected");
+      setHasUnsavedChanges(false);
+      setSaveState("saved");
+      setSubmitState(
+        mergedWorkspace.submission.status === "submitted" ? "submitted" : "idle",
+      );
+      syncDraftUrl(currentPathname, mergedWorkspace.draftId);
+      setStatusMessage(
+        "Selected draft retrieved. The application opened in draft mode at step 1.",
+      );
+    } catch (error) {
+      setStatusMessage(
+        error?.payload?.code === "draft_not_found"
+          ? "That draft is no longer available."
+          : "We couldn't retrieve the selected draft right now.",
+      );
+    }
+  }
+
   async function persistWorkspace(mode = "manual") {
     const versionAtRequest = saveVersionRef.current;
     const snapshot = workspace;
@@ -1621,6 +1857,8 @@ function App() {
     try {
       const savedWorkspace = await saveWorkspace(snapshot);
       const mergedWorkspace = mergeWorkspace(savedWorkspace);
+      syncDraftUrl(currentPathname, mergedWorkspace.draftId);
+      await refreshDraftList();
 
       setConnectionState("connected");
       setSaveState("saved");
@@ -1637,7 +1875,7 @@ function App() {
 
       setStatusMessage(
         mode === "manual"
-          ? "Draft saved to the secure database."
+          ? "Draft saved to the secure database. Use the retrieval link to reopen it later."
           : "All changes have been saved to the secure database.",
       );
     } catch {
@@ -1736,6 +1974,7 @@ function App() {
       });
     });
     markDirty();
+    markFieldsTouched(["documents", `documents.${key}`]);
   }
 
   function handleStepChange(stepId) {
@@ -1787,6 +2026,73 @@ function App() {
       };
     });
     markDirty();
+  }
+
+  async function handleDocumentFileSelect(key, file) {
+    if (isReadOnly || !file) {
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setStatusMessage("Document uploads must be 5 MB or smaller.");
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+
+      setWorkspace((current) => {
+        const nextWorkspace = invalidateSubmission(current);
+
+        return {
+          ...nextWorkspace,
+          documents: {
+            ...current.documents,
+            [key]: true,
+          },
+          documentFiles: {
+            ...current.documentFiles,
+            [key]: {
+              name: file.name,
+              type: file.type || "application/octet-stream",
+              size: file.size,
+              uploadedAt: new Date().toISOString(),
+              dataUrl,
+            },
+          },
+        };
+      });
+      markDirty();
+      markFieldsTouched(["documents", `documents.${key}`]);
+      setStatusMessage(`${file.name} was added to the draft and will be saved with it.`);
+    } catch {
+      setStatusMessage("We couldn't attach that document. Please try again.");
+    }
+  }
+
+  function removeDocumentFile(key) {
+    if (isReadOnly) {
+      return;
+    }
+
+    setWorkspace((current) => {
+      const nextWorkspace = invalidateSubmission(current);
+
+      return {
+        ...nextWorkspace,
+        documents: {
+          ...current.documents,
+          [key]: false,
+        },
+        documentFiles: {
+          ...current.documentFiles,
+          [key]: null,
+        },
+      };
+    });
+    markDirty();
+    markFieldsTouched(["documents", `documents.${key}`]);
+    setStatusMessage("Document removed from the draft.");
   }
 
   function toggleDeclaration(key) {
@@ -1853,6 +2159,8 @@ function App() {
     try {
       const submittedWorkspace = await submitWorkspace(snapshot);
       const mergedWorkspace = mergeWorkspace(submittedWorkspace);
+      syncDraftUrl(currentPathname, mergedWorkspace.draftId);
+      await refreshDraftList();
 
       setConnectionState("connected");
       setSaveState("saved");
@@ -2560,12 +2868,18 @@ function App() {
 
           <div className="option-grid">
             {workspace.documentOptions.map((document) => (
-              <OptionCard
+              <DocumentUploadCard
                 key={document.key}
                 title={document.title}
                 detail={document.detail}
                 checked={workspace.documents[document.key]}
-                onChange={() => toggleDocument(document.key)}
+                file={workspace.documentFiles?.[document.key]}
+                error={touchedFields.documents ? validationErrors[`documents.${document.key}`] ?? "" : ""}
+                onToggle={() => toggleDocument(document.key)}
+                onFileSelect={(event) =>
+                  handleDocumentFileSelect(document.key, event.target.files?.[0])
+                }
+                onRemove={() => removeDocumentFile(document.key)}
               />
             ))}
           </div>
@@ -2657,6 +2971,54 @@ function App() {
     }
   }
 
+  function renderDraftBrowser() {
+    return (
+      <section className="draft-browser">
+        <div className="draft-browser-header">
+          <p className="section-eyebrow">Draft library</p>
+          <h2>Saved Corporate Account Opening drafts</h2>
+          <p>
+            Select a draft to retrieve the latest saved version into the application
+            form.
+          </p>
+        </div>
+
+        {draftListState === "loading" ? (
+          <div className="draft-browser-empty">
+            <p>Loading available drafts...</p>
+          </div>
+        ) : draftListState === "error" ? (
+          <div className="draft-browser-empty">
+            <p>Saved drafts are temporarily unavailable right now.</p>
+          </div>
+        ) : drafts.length ? (
+          <div className="draft-browser-grid">
+            {drafts.map((draft) => (
+              <article key={draft.draftId} className="draft-browser-card">
+                <p className="section-eyebrow">Latest saved version</p>
+                <h3>{draft.entityLabel}</h3>
+                <p>Last updated {formatTimestamp(draft.updatedAt)}</p>
+                <div className="draft-browser-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => handleRetrieveDraft(draft.draftId)}
+                  >
+                    Retrieve draft
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="draft-browser-empty">
+            <p>No saved drafts yet. Save a draft from the application form to see it here.</p>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
     <div
       className={`application-shell${kycFabricContext.isKycFabricExperience ? " kyc-fabric-shell" : ""}`}
@@ -2714,6 +3076,10 @@ function App() {
         </div>
 
         <main className="form-stage">
+          {currentView === "drafts" ? (
+            renderDraftBrowser()
+          ) : (
+            <>
           <section className="stage-banner">
             <div>
               <p className="section-eyebrow">
@@ -2752,6 +3118,10 @@ function App() {
                   : "Continue"}
               </button>
             </div>
+          </section>
+
+          <section className="status-banner" aria-live="polite">
+            <p>{statusMessage}</p>
           </section>
 
           {currentStepValidationMessages.length ? (
@@ -2793,6 +3163,8 @@ function App() {
                 : `Next: ${nextStep.label}`}
             </button>
           </section>
+            </>
+          )}
         </main>
 
         <aside className="summary-panel">
@@ -2805,6 +3177,39 @@ function App() {
             <p className="progress-copy">
               {completedSections} of {workspace.steps.length} sections completed
             </p>
+          </div>
+
+          <div className="summary-card">
+            <p className="section-eyebrow">Draft mode</p>
+            <h3>Latest draft version</h3>
+            {draftListState === "loading" ? (
+              <p className="progress-copy">Loading latest draft...</p>
+            ) : draftListState === "error" ? (
+              <p className="progress-copy">
+                Saved drafts are temporarily unavailable. You can still continue with the form.
+              </p>
+            ) : latestDraft ? (
+              <div className={`draft-list-item${workspace.draftId === latestDraft.draftId ? " active" : ""}`}>
+                <span>{latestDraft.entityLabel}</span>
+                <strong>{formatTimestamp(latestDraft.updatedAt)}</strong>
+                <div className="draft-list-actions">
+                  <button
+                    type="button"
+                    className="secondary-button draft-action-button"
+                    onClick={() => handleRetrieveDraft(latestDraft.draftId)}
+                  >
+                    Retrieve draft
+                  </button>
+                  <a className="draft-inline-link" href={draftBrowserUrl}>
+                    Open link
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <p className="progress-copy">
+                No saved drafts yet. Start entering entity details and save a draft to see it here.
+              </p>
+            )}
           </div>
 
           <div className="summary-card">

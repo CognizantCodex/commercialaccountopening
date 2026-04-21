@@ -1,4 +1,5 @@
 import { buildScenarioState } from '@/mock-data/adapters';
+import { adaptPlatformSnapshot, type PlatformSnapshotDto } from '@/services/platform-adapter';
 import { persistDataSource, platformApi, resolveInitialDataSource } from '@/services/platform-api';
 import { createScenarioPatch, findWorkflowEvent } from '@/store/scenario';
 import type { IntegrationSlice, PlatformSliceCreator } from '@/store/types';
@@ -9,6 +10,75 @@ function toErrorMessage(error: unknown) {
   }
 
   return 'Unable to sync platform data.';
+}
+
+function mergeById<T extends { id: string }>(baseItems: T[], appendedItems: T[]) {
+  const seen = new Set();
+  return [...appendedItems, ...baseItems].filter((item) => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+    seen.add(item.id);
+    return true;
+  });
+}
+
+function mergeAndSortByTimestamp<T extends { id: string }>(
+  baseItems: T[],
+  appendedItems: T[],
+  getTimestamp: (item: T) => string,
+  descending = true,
+) {
+  return mergeById(baseItems, appendedItems).sort((left, right) => {
+    const leftTime = Date.parse(getTimestamp(left));
+    const rightTime = Date.parse(getTimestamp(right));
+    return descending ? rightTime - leftTime : leftTime - rightTime;
+  });
+}
+
+function mergeScenarioWithAccountOpeningSnapshot(
+  scenario: ScenarioState,
+  accountOpeningSnapshot: PlatformSnapshotDto,
+) {
+  const mergedSnapshot: PlatformSnapshotDto = {
+    clients: mergeById(scenario.clients, accountOpeningSnapshot.clients ?? []),
+    cases: mergeById(scenario.cases, accountOpeningSnapshot.cases ?? []),
+    timeline: mergeAndSortByTimestamp(
+      scenario.timeline,
+      accountOpeningSnapshot.timeline ?? [],
+      (event) => event.timestamp,
+      false,
+    ),
+    agents: scenario.agents,
+    confidenceMatrix: scenario.confidenceMatrix,
+    taskThroughput: scenario.taskThroughput,
+    activityFeed: mergeAndSortByTimestamp(
+      scenario.activityFeed,
+      accountOpeningSnapshot.activityFeed ?? [],
+      (item) => item.timestamp,
+    ),
+    alerts: mergeAndSortByTimestamp(
+      scenario.alerts,
+      accountOpeningSnapshot.alerts ?? [],
+      (item) => item.eventTime,
+    ),
+    decisionLogs: mergeAndSortByTimestamp(
+      scenario.decisionLogs,
+      accountOpeningSnapshot.decisionLogs ?? [],
+      (item) => item.createdAt,
+    ),
+  };
+
+  return adaptPlatformSnapshot(mergedSnapshot);
+}
+
+async function hydrateScenarioWithAccountOpeningCases(baseScenario: ScenarioState) {
+  try {
+    const accountOpeningSnapshot = await platformApi.fetchAccountOpeningSnapshot();
+    return mergeScenarioWithAccountOpeningSnapshot(baseScenario, accountOpeningSnapshot);
+  } catch {
+    return baseScenario;
+  }
 }
 
 export const createIntegrationSlice: PlatformSliceCreator<IntegrationSlice> = (set, get) => ({
@@ -25,7 +95,7 @@ export const createIntegrationSlice: PlatformSliceCreator<IntegrationSlice> = (s
     }
 
     if (state.dataSource === 'demo') {
-      const scenario = buildScenarioState(0);
+      const scenario = await hydrateScenarioWithAccountOpeningCases(buildScenarioState(0));
       set((current) => ({
         hydrationStatus: 'ready',
         loadError: null,
@@ -45,7 +115,9 @@ export const createIntegrationSlice: PlatformSliceCreator<IntegrationSlice> = (s
     });
 
     try {
-      const scenario = await platformApi.fetchSnapshot();
+      const scenario = await hydrateScenarioWithAccountOpeningCases(
+        await platformApi.fetchSnapshot(),
+      );
       set((current) => ({
         hydrationStatus: 'ready',
         loadError: null,

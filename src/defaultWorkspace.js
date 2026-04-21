@@ -1,4 +1,5 @@
 export const defaultWorkspace = {
+  draftId: null,
   brandName: "Cognizant",
   formTitle: "Corporate Account Opening Application",
   intro:
@@ -271,6 +272,14 @@ export const defaultWorkspace = {
     boardResolution: false,
     signerIdentification: false,
     addressProof: false,
+  },
+  documentFiles: {
+    certificateOfFormation: null,
+    taxIdLetter: null,
+    ownershipChart: null,
+    boardResolution: null,
+    signerIdentification: null,
+    addressProof: null,
   },
   declarations: {
     certifyAuthority: false,

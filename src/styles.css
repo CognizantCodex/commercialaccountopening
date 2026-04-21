@@ -763,6 +763,159 @@ button {
   line-height: 1.55;
 }
 
+.status-banner {
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  border: 1px solid rgba(16, 49, 124, 0.1);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.96), rgba(238, 246, 255, 0.92));
+}
+
+.status-banner p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.kyc-fabric-shell .status-banner {
+  border-color: rgba(157, 193, 255, 0.14);
+  background: linear-gradient(180deg, rgba(11, 25, 49, 0.94), rgba(8, 20, 40, 0.9));
+}
+
+.draft-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.draft-list-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(16, 49, 124, 0.1);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(239, 246, 255, 0.92));
+  color: inherit;
+  text-align: left;
+}
+
+.draft-list-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.draft-action-button {
+  padding: 10px 14px;
+}
+
+.draft-inline-link {
+  color: var(--navy);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.draft-inline-link:hover {
+  color: var(--accent-strong);
+}
+
+.draft-list-item span {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.draft-list-item strong {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.draft-list-item:hover {
+  border-color: rgba(0, 198, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.draft-list-item.active {
+  border-color: rgba(0, 198, 255, 0.3);
+  background: linear-gradient(135deg, rgba(0, 198, 255, 0.12), rgba(16, 49, 124, 0.06));
+}
+
+.draft-browser {
+  display: grid;
+  gap: 20px;
+}
+
+.draft-browser-header p,
+.draft-browser-header h2 {
+  margin: 0;
+}
+
+.draft-browser-header h2 {
+  margin-top: 10px;
+}
+
+.draft-browser-empty,
+.draft-browser-card {
+  padding: 22px;
+  border: 1px solid rgba(16, 49, 124, 0.1);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(239, 246, 255, 0.92));
+}
+
+.draft-browser-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.draft-browser-card h3,
+.draft-browser-card p {
+  margin: 0;
+}
+
+.draft-browser-card h3 {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.draft-browser-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.kyc-fabric-shell .draft-list-item {
+  border-color: rgba(157, 193, 255, 0.12);
+  background: linear-gradient(180deg, rgba(10, 24, 48, 0.94), rgba(8, 19, 37, 0.94));
+}
+
+.kyc-fabric-shell .draft-list-item span {
+  color: #eef7ff;
+}
+
+.kyc-fabric-shell .draft-list-item strong {
+  color: rgba(215, 238, 255, 0.74);
+}
+
+.kyc-fabric-shell .draft-inline-link {
+  color: #d7eeff;
+}
+
+.kyc-fabric-shell .draft-list-item.active {
+  border-color: rgba(149, 242, 227, 0.28);
+  background: linear-gradient(135deg, rgba(63, 199, 255, 0.16), rgba(123, 230, 212, 0.08));
+}
+
+.kyc-fabric-shell .draft-browser-empty,
+.kyc-fabric-shell .draft-browser-card {
+  border-color: rgba(157, 193, 255, 0.12);
+  background: linear-gradient(180deg, rgba(10, 24, 48, 0.94), rgba(8, 19, 37, 0.94));
+}
+
 .stage-banner p:last-child,
 .section-heading p,
 .rail-block p,
@@ -1248,6 +1401,54 @@ button {
   position: absolute;
   inset: 4px;
   background: #fff;
+}
+
+.document-card {
+  display: grid;
+  gap: 12px;
+}
+
+.document-card-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.document-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.document-file-pill {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid rgba(16, 49, 124, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.document-file-pill strong,
+.document-file-pill small {
+  display: block;
+}
+
+.document-file-pill small,
+.document-card-copy {
+  color: var(--ink-soft);
+}
+
+.document-remove-button {
+  padding: 10px 14px;
+}
+
+.kyc-fabric-shell .document-file-pill {
+  border-color: rgba(157, 193, 255, 0.12);
+  background: rgba(8, 19, 37, 0.88);
 }
 
 .option-copy {

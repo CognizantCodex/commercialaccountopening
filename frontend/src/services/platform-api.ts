@@ -79,6 +79,9 @@ export function createPlatformApi() {
       const payload = await client.get<PlatformSnapshotDto>(config.snapshotPath);
       return adaptPlatformSnapshot(payload);
     },
+    async fetchAccountOpeningSnapshot(): Promise<PlatformSnapshotDto> {
+      return client.get<PlatformSnapshotDto>('/api/account-opening/platform-snapshot');
+    },
     async runCaseWorkflowAction(action: CaseWorkflowAction, caseId: string) {
       const path = resolvePath(action, caseId, config);
       await client.post(path, {

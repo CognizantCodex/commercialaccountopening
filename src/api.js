@@ -1,5 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+function withDraftId(path, draftId) {
+  if (!draftId) {
+    return `${API_BASE}${path}`;
+  }
+
+  const params = new URLSearchParams({ draft: draftId });
+  return `${API_BASE}${path}?${params.toString()}`;
+}
+
 async function readJson(response) {
   const payload = await response.json().catch(() => null);
 
@@ -15,13 +24,18 @@ async function readJson(response) {
   return payload;
 }
 
-export async function loadWorkspace() {
-  const response = await fetch(`${API_BASE}/account-opening/workspace`);
+export async function loadWorkspace(draftId) {
+  const response = await fetch(withDraftId("/account-opening/workspace", draftId));
   return readJson(response);
 }
 
-export async function saveWorkspace(workspace) {
-  const response = await fetch(`${API_BASE}/account-opening/workspace`, {
+export async function listWorkspaceDrafts() {
+  const response = await fetch(`${API_BASE}/account-opening/drafts`);
+  return readJson(response);
+}
+
+export async function saveWorkspace(workspace, draftId = workspace?.draftId) {
+  const response = await fetch(withDraftId("/account-opening/workspace", draftId), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -32,8 +46,8 @@ export async function saveWorkspace(workspace) {
   return readJson(response);
 }
 
-export async function submitWorkspace(workspace) {
-  const response = await fetch(`${API_BASE}/account-opening/submit`, {
+export async function submitWorkspace(workspace, draftId = workspace?.draftId) {
+  const response = await fetch(withDraftId("/account-opening/submit", draftId), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
