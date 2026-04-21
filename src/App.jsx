@@ -1324,13 +1324,13 @@ function OwnerCard({
   );
 }
 
-function App() {
+function App({ forceStandaloneShell = false } = {}) {
   const currentPathname =
     typeof window === "undefined" ? "/" : window.location.pathname;
   const shouldResetOnRefresh = isReloadNavigation();
   const currentView = shouldResetOnRefresh ? "form" : getCurrentView();
   const embeddedApplicationRoute = isEmbeddedApplicationRoute(currentPathname);
-  const kycFabricContext = embeddedApplicationRoute
+  const kycFabricContext = embeddedApplicationRoute || forceStandaloneShell
     ? { isKycFabricExperience: false, routeLabel: "Application" }
     : getKycFabricContext(currentPathname);
   const requestedDraftId = shouldResetOnRefresh ? "" : getRequestedDraftId();
@@ -2229,7 +2229,7 @@ function App() {
   function renderCompanySection() {
     return (
       <>
-        <section className="form-card">
+        <section className="form-card corporate-profile-card">
           <div className="section-heading">
             <div>
               <p className="section-eyebrow">Corporate profile</p>
@@ -3021,7 +3021,9 @@ function App() {
 
   return (
     <div
-      className={`application-shell${kycFabricContext.isKycFabricExperience ? " kyc-fabric-shell" : ""}`}
+      className={`application-shell${
+        kycFabricContext.isKycFabricExperience ? " kyc-fabric-shell" : " customer-account-shell"
+      }`}
     >
       <header className="hero-panel">
         <div className="hero-copy">
@@ -3075,7 +3077,7 @@ function App() {
           </aside>
         </div>
 
-        <main className="form-stage">
+        <main className={`form-stage${workspace.activeStep === "company" ? " form-stage-light" : ""}`}>
           {currentView === "drafts" ? (
             renderDraftBrowser()
           ) : (
@@ -3167,7 +3169,7 @@ function App() {
           )}
         </main>
 
-        <aside className="summary-panel">
+        <aside className="summary-panel summary-panel-light">
           <div className="summary-card">
             <p className="section-eyebrow">Application overview</p>
             <h3>Submission readiness</h3>

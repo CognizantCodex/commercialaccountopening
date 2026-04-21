@@ -29,6 +29,14 @@ export function AppShell() {
     document.title = `${routeCatalog[currentRoute].title} | Cognizant KYC Fabric`;
   }, [currentRoute, navigateToView]);
 
+  useEffect(() => {
+    document.body.classList.add('kyc-fabric-route');
+
+    return () => {
+      document.body.classList.remove('kyc-fabric-route');
+    };
+  }, []);
+
   return (
     <div className="cognizant-shell flex min-h-screen flex-col lg:flex-row">
       <GlobalHotkeys />

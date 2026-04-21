@@ -104,6 +104,10 @@ body {
   font-family: var(--font-sans);
 }
 
+body.legacy-application-route {
+  background: #ffffff;
+}
+
 body::before {
   position: fixed;
   inset: 0;
@@ -115,6 +119,10 @@ body::before {
   content: "";
   mask-image: radial-gradient(circle at center, black, transparent 85%);
   pointer-events: none;
+}
+
+body.legacy-application-route::before {
+  content: none;
 }
 
 .light body::before {
