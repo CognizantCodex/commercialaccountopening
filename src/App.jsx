@@ -1372,6 +1372,7 @@ function App({ forceStandaloneShell = false } = {}) {
     ? { isKycFabricExperience: false, routeLabel: "Application" }
     : getKycFabricContext(currentPathname);
   const requestedDraftId = shouldResetOnRefresh ? "" : getRequestedDraftId();
+  const shouldLoadRequestedDraft = Boolean(requestedDraftId);
   const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [drafts, setDrafts] = useState([]);
@@ -1409,7 +1410,9 @@ function App({ forceStandaloneShell = false } = {}) {
           await Promise.allSettled([
             listWorkspaceDrafts(),
             listSubmittedApplications(),
-            loadWorkspace(requestedDraftId || undefined),
+            shouldLoadRequestedDraft
+              ? loadWorkspace(requestedDraftId)
+              : Promise.resolve(null),
           ]);
 
         if (ignore) {
@@ -1432,13 +1435,7 @@ function App({ forceStandaloneShell = false } = {}) {
           setSubmissionListState("error");
         }
 
-        const canRenderSubmittedView =
-          currentView === "submitted" &&
-          (submissionResponse.status === "fulfilled" ||
-            (workspaceResponse.status === "fulfilled" &&
-              workspaceResponse.value?.submission?.status === "submitted"));
-
-        if (workspaceResponse.status === "fulfilled") {
+        if (workspaceResponse.status === "fulfilled" && workspaceResponse.value) {
           const loadedWorkspace = workspaceResponse.value;
 
           setWorkspace(
@@ -1451,14 +1448,14 @@ function App({ forceStandaloneShell = false } = {}) {
           if (requestedDraftId) {
             syncDraftUrl(currentPathname, loadedWorkspace.draftId);
           }
-        } else if (!canRenderSubmittedView) {
+        } else if (shouldLoadRequestedDraft) {
           throw workspaceResponse.reason;
         }
 
         setConnectionState(
           draftResponse.status === "fulfilled" ||
             submissionResponse.status === "fulfilled" ||
-            workspaceResponse.status === "fulfilled"
+            (workspaceResponse.status === "fulfilled" && workspaceResponse.value)
             ? "connected"
             : "fallback",
         );
@@ -1468,16 +1465,10 @@ function App({ forceStandaloneShell = false } = {}) {
             : currentView === "submitted"
               ? submissionResponse.status === "fulfilled"
                 ? "Submitted applications loaded."
-                : workspaceResponse.status === "fulfilled" &&
-                    workspaceResponse.value?.submission?.status === "submitted"
-                  ? "The latest submitted application has been loaded."
-                  : "Submitted applications are temporarily unavailable right now."
+                : "Submitted applications are temporarily unavailable right now."
               : currentView === "drafts"
                 ? "Saved drafts loaded. Select a draft to continue."
-                : workspaceResponse.status === "fulfilled" &&
-                    workspaceResponse.value?.submission?.status === "submitted"
-                  ? "The latest submitted application has been loaded."
-                  : "Draft mode is ready. Start a new application at step 1 or select an existing draft.",
+                : "Draft mode is ready. Start a new application at step 1 or select an existing draft.",
         );
         setHasBootstrapped(true);
       } catch (error) {
@@ -1502,14 +1493,14 @@ function App({ forceStandaloneShell = false } = {}) {
     return () => {
       ignore = true;
     };
-  }, [currentPathname, requestedDraftId, shouldResetOnRefresh]);
+  }, [currentPathname, requestedDraftId, shouldLoadRequestedDraft, shouldResetOnRefresh]);
 
   const applicationBasePath = currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
     ? KYC_FABRIC_APPLICATION_PATH
     : "/";
   const draftBrowserUrl = buildDraftBrowserPath(currentPathname);
   const submittedApplicationsUrl = buildSubmittedApplicationsPath(currentPathname);
-  const customerAccountOpeningUrl = buildDraftPath(applicationBasePath, workspace.draftId);
+  const customerAccountOpeningUrl = applicationBasePath;
   const latestDraft = drafts[0] ?? null;
   const fallbackSubmission =
     workspace.submission?.status === "submitted"
@@ -3430,28 +3421,34 @@ function App({ forceStandaloneShell = false } = {}) {
             {isMenuExpanded ? (
               <nav className="workspace-switcher" aria-label="Workspace navigation">
                 <div className={`workspace-link workspace-link-group${!kycFabricContext.isKycFabricExperience ? " active" : ""}`}>
-                  <span className="workspace-link-label">Customer Onboarding</span>
-                  <span className="workspace-link-detail">
-                    Open the onboarding form, review submitted applications, or resume saved drafts.
-                  </span>
+                  <div className="workspace-group-header">
+                    <span className="workspace-link-label">Customer Onboarding</span>
+                    <span className="workspace-link-detail">
+                      Start a new onboarding request or reopen previously saved work.
+                    </span>
+                  </div>
                   <div className="workspace-submenu">
+                    <span className="workspace-submenu-label">Choose a view</span>
                     <a
                       className={`workspace-sublink${!kycFabricContext.isKycFabricExperience && !isDraftBrowserView && !isSubmittedApplicationsView ? " active" : ""}`}
                       href={customerAccountOpeningUrl}
                     >
-                      Onboarding application
+                      <span className="workspace-sublink-kicker">Start</span>
+                      <span className="workspace-sublink-label">New application</span>
                     </a>
                     <a
                       className={`workspace-sublink${isSubmittedApplicationsView ? " active" : ""}`}
                       href={submittedApplicationsUrl}
                     >
-                      Submitted applications
+                      <span className="workspace-sublink-kicker">Review</span>
+                      <span className="workspace-sublink-label">Submitted applications</span>
                     </a>
                     <a
                       className={`workspace-sublink${isDraftBrowserView ? " active" : ""}`}
                       href={draftBrowserUrl}
                     >
-                      Draft applications
+                      <span className="workspace-sublink-kicker">Resume</span>
+                      <span className="workspace-sublink-label">Saved drafts</span>
                     </a>
                   </div>
                 </div>
@@ -3460,6 +3457,9 @@ function App({ forceStandaloneShell = false } = {}) {
                   href={KYC_FABRIC_URL}
                 >
                   <span className="workspace-link-label">KYC-Fabric</span>
+                  <span className="workspace-link-detail">
+                    Open the operating dashboard for case, risk, and governance views.
+                  </span>
                 </a>
               </nav>
             ) : null}

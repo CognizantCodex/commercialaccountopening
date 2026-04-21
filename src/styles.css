@@ -538,15 +538,49 @@ button {
   cursor: default;
 }
 
+.workspace-group-header {
+  display: grid;
+  gap: 4px;
+}
+
 .workspace-submenu {
+  position: relative;
   display: grid;
   gap: 8px;
   margin-top: 12px;
+  margin-left: 10px;
+  padding-top: 8px;
+  padding-left: 18px;
+}
+
+.workspace-submenu::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 8px;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(16, 49, 124, 0.06),
+    rgba(16, 49, 124, 0.18),
+    rgba(16, 49, 124, 0.06)
+  );
+}
+
+.workspace-submenu-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .workspace-sublink {
-  display: block;
-  padding: 11px 12px;
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px 11px 14px;
   border: 1px solid rgba(16, 49, 124, 0.08);
   border-radius: 14px;
   color: var(--ink-soft);
@@ -558,6 +592,16 @@ button {
     background-color 180ms ease,
     box-shadow 180ms ease,
     color 180ms ease;
+}
+
+.workspace-sublink::before {
+  content: "";
+  position: absolute;
+  left: -18px;
+  top: 50%;
+  width: 12px;
+  height: 1px;
+  background: rgba(16, 49, 124, 0.18);
 }
 
 .workspace-sublink:hover {
@@ -573,6 +617,20 @@ button {
   border-color: rgba(0, 198, 255, 0.26);
   background: linear-gradient(135deg, rgba(0, 198, 255, 0.12), rgba(16, 49, 124, 0.06));
   box-shadow: 0 10px 22px rgba(16, 49, 124, 0.08);
+}
+
+.workspace-sublink-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #18b2ff;
+}
+
+.workspace-sublink-label {
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: inherit;
 }
 
 .workspace-link-label {
@@ -606,6 +664,19 @@ button {
   border-color: rgba(157, 193, 255, 0.12);
   color: rgba(215, 238, 255, 0.78);
   background: rgba(7, 18, 37, 0.45);
+}
+
+.kyc-fabric-shell .workspace-submenu::before,
+.kyc-fabric-shell .workspace-sublink::before {
+  background: rgba(157, 193, 255, 0.18);
+}
+
+.kyc-fabric-shell .workspace-submenu-label {
+  color: rgba(215, 238, 255, 0.58);
+}
+
+.kyc-fabric-shell .workspace-sublink-kicker {
+  color: #95f2e3;
 }
 
 .kyc-fabric-shell .workspace-sublink:hover {
