@@ -34,6 +34,10 @@ describe('AppShell', () => {
       </MemoryRouter>,
     );
 
+    expect(
+      screen.getByRole('heading', { name: 'KYC Case Explorer', level: 2 }),
+    ).toBeInTheDocument();
+
     await waitFor(() => {
       expect(document.title).toBe('KYC Case Explorer | Cognizant KYC Fabric');
     });

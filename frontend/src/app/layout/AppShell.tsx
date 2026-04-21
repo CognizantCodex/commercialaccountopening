@@ -1,4 +1,3 @@
-import { AnimatePresence } from 'framer-motion';
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Breadcrumbs } from '@/app/layout/Breadcrumbs';
@@ -9,7 +8,6 @@ import { GlobalHotkeys } from '@/app/layout/GlobalHotkeys';
 import { KycFabricFooter } from '@/app/layout/KycFabricFooter';
 import { SidebarNav } from '@/app/layout/SidebarNav';
 import { TopBar } from '@/app/layout/TopBar';
-import { AnimatedPage } from '@/components/animations/AnimatedPage';
 import { RouteAnnouncer } from '@/components/feedback/RouteAnnouncer';
 import { usePlatformStore } from '@/store';
 import { routeCatalog, routeOrder } from '@/services/selectors';
@@ -40,20 +38,16 @@ export function AppShell() {
         <SidebarNav />
       </aside>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-        <TopBar />
+        <TopBar currentRoute={currentRoute} />
         <div className="border-b border-[var(--border)] px-4 py-3 lg:hidden">
           <SidebarNav compact />
         </div>
         <DemoControlBar />
         <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6">
-            <Breadcrumbs />
+            <Breadcrumbs currentRoute={currentRoute} />
             <DecisionBrief route={currentRoute} />
-            <AnimatePresence mode="wait">
-              <AnimatedPage key={location.pathname}>
-                <Outlet />
-              </AnimatedPage>
-            </AnimatePresence>
+            <Outlet />
           </div>
         </main>
         <div className="px-4 pb-6 sm:px-6 lg:px-8">

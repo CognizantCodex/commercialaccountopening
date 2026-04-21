@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import {
   createBrowserRouter,
   Navigate,
@@ -6,37 +6,12 @@ import {
 } from 'react-router-dom';
 import { AppShell } from '@/app/layout/AppShell';
 import { LoadingSkeleton } from '@/components/feedback/LoadingSkeleton';
-
-const ExecutiveView = lazy(() =>
-  import('@/features/executive/ExecutiveView').then((module) => ({
-    default: module.ExecutiveView,
-  })),
-);
-const AgentsView = lazy(() =>
-  import('@/features/agents/AgentsView').then((module) => ({
-    default: module.AgentsView,
-  })),
-);
-const CasesView = lazy(() =>
-  import('@/features/cases/CasesView').then((module) => ({
-    default: module.CasesView,
-  })),
-);
-const MonitoringView = lazy(() =>
-  import('@/features/monitoring/MonitoringView').then((module) => ({
-    default: module.MonitoringView,
-  })),
-);
-const GovernanceView = lazy(() =>
-  import('@/features/governance/GovernanceView').then((module) => ({
-    default: module.GovernanceView,
-  })),
-);
-const LegacyAccountOpeningPage = lazy(() =>
-  import('@/features/application/LegacyAccountOpeningPage').then((module) => ({
-    default: module.LegacyAccountOpeningPage,
-  })),
-);
+import { ExecutiveView } from '@/features/executive/ExecutiveView';
+import { AgentsView } from '@/features/agents/AgentsView';
+import { CasesView } from '@/features/cases/CasesView';
+import { MonitoringView } from '@/features/monitoring/MonitoringView';
+import { GovernanceView } from '@/features/governance/GovernanceView';
+import { LegacyAccountOpeningPage } from '@/features/application/LegacyAccountOpeningPage';
 
 function RouteFallback() {
   return (
@@ -66,46 +41,11 @@ const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <Navigate to="/kyc-fabric/executive" replace /> },
-      {
-        path: 'executive',
-        element: (
-          <Suspense fallback={<RouteFallback />}>
-            <ExecutiveView />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'agents',
-        element: (
-          <Suspense fallback={<RouteFallback />}>
-            <AgentsView />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'cases',
-        element: (
-          <Suspense fallback={<RouteFallback />}>
-            <CasesView />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'monitoring',
-        element: (
-          <Suspense fallback={<RouteFallback />}>
-            <MonitoringView />
-          </Suspense>
-        ),
-      },
-      {
-        path: 'governance',
-        element: (
-          <Suspense fallback={<RouteFallback />}>
-            <GovernanceView />
-          </Suspense>
-        ),
-      },
+      { path: 'executive', element: <ExecutiveView /> },
+      { path: 'agents', element: <AgentsView /> },
+      { path: 'cases', element: <CasesView /> },
+      { path: 'monitoring', element: <MonitoringView /> },
+      { path: 'governance', element: <GovernanceView /> },
     ],
   },
 ], {

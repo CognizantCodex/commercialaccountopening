@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { usePlatformStore } from '@/store';
 import { routeCatalog } from '@/services/selectors';
+import type { DashboardRoute } from '@/types/platform';
 
-export function TopBar() {
-  const currentRoute = usePlatformStore((state) => state.currentRoute);
+export function TopBar({ currentRoute }: { currentRoute: DashboardRoute }) {
   const setCommandPaletteOpen = usePlatformStore((state) => state.setCommandPaletteOpen);
   const themeMode = usePlatformStore((state) => state.themeMode);
   const cycleTheme = usePlatformStore((state) => state.cycleTheme);

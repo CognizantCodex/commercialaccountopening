@@ -1,9 +1,9 @@
 import { ChevronRight, Home } from 'lucide-react';
 import { usePlatformStore } from '@/store';
 import { getSelectedCase, routeCatalog } from '@/services/selectors';
+import type { DashboardRoute } from '@/types/platform';
 
-export function Breadcrumbs() {
-  const currentRoute = usePlatformStore((state) => state.currentRoute);
+export function Breadcrumbs({ currentRoute }: { currentRoute: DashboardRoute }) {
   const state = usePlatformStore();
   const selectedCase = getSelectedCase(state);
 

@@ -45,4 +45,37 @@ describe('ExecutiveView', () => {
 
     expect(navigateMock).toHaveBeenCalledWith(routeCatalog[metric.route].path);
   });
+
+  it('shows loading skeletons while the live snapshot is hydrating', () => {
+    usePlatformStore.setState({
+      dataSource: 'live',
+      hydrationStatus: 'loading',
+    });
+
+    const { container } = renderWithProviders(<ExecutiveView />);
+
+    expect(screen.queryByText('Regional straight-through onboarding momentum')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
+  });
+
+  it('shows a retry state when live hydration fails', async () => {
+    const user = userEvent.setup();
+    const refreshPlatform = vi.fn().mockResolvedValue(undefined);
+
+    usePlatformStore.setState({
+      dataSource: 'live',
+      hydrationStatus: 'error',
+      loadError: 'Snapshot request failed.',
+      refreshPlatform,
+    });
+
+    renderWithProviders(<ExecutiveView />);
+
+    expect(screen.getByText('Executive metrics are waiting for a clean live refresh')).toBeInTheDocument();
+    expect(screen.getByText('Snapshot request failed.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /refresh live data/i }));
+
+    expect(refreshPlatform).toHaveBeenCalledOnce();
+  });
 });
