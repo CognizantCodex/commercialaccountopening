@@ -76,7 +76,7 @@ export function CasesView() {
             <button
               key={filter}
               type="button"
-              className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.16em] ${statusFilter === filter ? 'border-[color:rgba(0,201,177,0.45)] bg-[var(--surface-accent)] text-[var(--foreground)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
+              className={`rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.16em] ${statusFilter === filter ? 'border-[var(--border-strong)] bg-[var(--surface-accent)] text-[var(--foreground)] shadow-[var(--shadow-soft)]' : 'border-[var(--border)] text-[var(--muted-foreground)]'}`}
               onClick={() => setStatusFilter(filter)}
             >
               {filter}
@@ -88,7 +88,7 @@ export function CasesView() {
             <button
               key={record.id}
               type="button"
-              className={`w-full rounded-[1.35rem] border p-4 text-left transition-colors ${selectedCaseId === record.id ? 'border-[color:rgba(0,201,177,0.45)] bg-[linear-gradient(135deg,rgba(0,201,177,0.14),rgba(31,111,235,0.08))]' : 'border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]'}`}
+              className={`w-full rounded-[1.35rem] border p-4 text-left transition-colors ${selectedCaseId === record.id ? 'border-[var(--border-strong)] bg-[var(--brand-gradient-soft)] shadow-[var(--shadow-soft)]' : 'border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]'}`}
               onClick={() => selectCase(record.id)}
             >
               <div className="flex items-center justify-between gap-3">

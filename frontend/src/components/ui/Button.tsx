@@ -6,9 +6,9 @@ type ButtonSize = 'default' | 'icon';
 
 const variantClassName: Record<ButtonVariant, string> = {
   primary:
-    'bg-[linear-gradient(135deg,rgba(0,201,177,0.95),rgba(31,111,235,0.85))] text-white border-transparent shadow-[var(--shadow-soft)]',
+    'bg-[var(--brand-gradient)] text-white border-transparent shadow-[var(--shadow-soft)]',
   secondary:
-    'bg-[var(--surface-muted)] text-[var(--foreground)] border-[var(--border)]',
+    'bg-[var(--surface-strong)] text-[var(--foreground)] border-[var(--border-strong)]',
   ghost:
     'bg-transparent text-[var(--muted-foreground)] border-transparent hover:text-[var(--foreground)]',
 };

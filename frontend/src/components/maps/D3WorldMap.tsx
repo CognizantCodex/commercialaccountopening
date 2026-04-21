@@ -197,8 +197,8 @@ export function D3WorldMap({
               <g key={region.id} transform={`translate(${point[0]}, ${point[1]})`} pointerEvents="none">
                 <circle
                   r={Math.max(region.bubbleValue / 6, 18)}
-                  fill={isSelected ? 'rgba(31,111,235,0.34)' : 'rgba(31,111,235,0.22)'}
-                  stroke={isSelected ? 'rgba(255,255,255,0.72)' : 'rgba(31,111,235,0.58)'}
+                  fill={isSelected ? 'rgba(65,200,255,0.34)' : 'rgba(36,87,214,0.22)'}
+                  stroke={isSelected ? 'rgba(242,247,255,0.72)' : 'rgba(65,200,255,0.56)'}
                   strokeWidth={isSelected ? 1.6 : 1}
                 />
                 <circle r={14} fill="var(--accent-secondary)" opacity="0.92" />

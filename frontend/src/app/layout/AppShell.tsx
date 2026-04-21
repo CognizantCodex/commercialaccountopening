@@ -27,15 +27,15 @@ export function AppShell() {
 
   useEffect(() => {
     navigateToView(currentRoute);
-    document.title = `${routeCatalog[currentRoute].title} | KYC North Star Intelligence Platform`;
+    document.title = `${routeCatalog[currentRoute].title} | Cognizant KYC Fabric`;
   }, [currentRoute, navigateToView]);
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="cognizant-shell flex min-h-screen flex-col lg:flex-row">
       <GlobalHotkeys />
       <RouteAnnouncer />
       <CommandPalette />
-      <aside className="hidden border-r border-[var(--border)] bg-[var(--shell-nav)] lg:block lg:w-80 lg:shrink-0 lg:backdrop-blur-xl">
+      <aside className="cognizant-sidebar hidden border-r border-[var(--border)] lg:block lg:w-80 lg:shrink-0">
         <SidebarNav />
       </aside>
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">

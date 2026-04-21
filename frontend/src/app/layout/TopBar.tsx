@@ -20,10 +20,13 @@ export function TopBar() {
     );
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--shell-topbar)] backdrop-blur-xl">
+    <header className="cognizant-topbar sticky top-0 z-20 border-b border-[var(--border)] backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-[1700px] items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
+            <span className="hidden rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--muted-foreground)] md:inline-flex">
+              Cognizant KYC Fabric
+            </span>
             <Badge variant="info">{routeCatalog[currentRoute].eyebrow}</Badge>
             <span className="text-xs uppercase tracking-[0.24em] text-[var(--muted-foreground)]">
               Persona: {routeCatalog[currentRoute].persona}

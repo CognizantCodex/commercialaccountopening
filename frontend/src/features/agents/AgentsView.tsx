@@ -155,7 +155,7 @@ export function AgentsView() {
             </div>
           </div>
 
-          <div className="mt-4 rounded-[1.35rem] border border-[var(--border)] bg-[linear-gradient(135deg,rgba(0,201,177,0.12),rgba(31,111,235,0.08))] p-4">
+          <div className="mt-4 rounded-[1.35rem] border border-[var(--border-strong)] bg-[var(--brand-gradient-soft)] p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
               Operational spotlight
             </div>

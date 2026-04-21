@@ -19,8 +19,8 @@ export function AgentStatusCard({
   const className = cn(
     'h-full rounded-[1.75rem] border bg-[var(--surface-elevated)] p-5 text-left shadow-[var(--shadow-card)] transition-all duration-150',
     selected
-      ? 'border-[color:rgba(0,201,177,0.45)] bg-[linear-gradient(135deg,rgba(0,201,177,0.14),rgba(31,111,235,0.08))]'
-      : 'border-[var(--border)] hover:-translate-y-0.5 hover:border-[color:rgba(0,201,177,0.28)]',
+      ? 'border-[var(--border-strong)] bg-[var(--brand-gradient-soft)]'
+      : 'border-[var(--border)] hover:-translate-y-0.5 hover:border-[color:rgba(65,200,255,0.28)]',
     onSelect ? 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]' : '',
   );
 
