@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useId, useRef, useState } from "react";
 import {
+  listSubmittedApplications,
   listWorkspaceDrafts,
   loadWorkspace,
   saveWorkspace,
@@ -60,9 +61,13 @@ function getCurrentView() {
     return "form";
   }
 
-  return new URLSearchParams(window.location.search).get("view") === "drafts"
-    ? "drafts"
-    : "form";
+  const requestedView = new URLSearchParams(window.location.search).get("view");
+
+  if (requestedView === "drafts" || requestedView === "submitted") {
+    return requestedView;
+  }
+
+  return "form";
 }
 
 function isReloadNavigation() {
@@ -84,6 +89,10 @@ function buildDraftPath(pathname, draftId) {
 
 function buildDraftBrowserPath(pathname) {
   return `${pathname}?${new URLSearchParams({ view: "drafts" }).toString()}`;
+}
+
+function buildSubmittedApplicationsPath(pathname) {
+  return `${pathname}?${new URLSearchParams({ view: "submitted" }).toString()}`;
 }
 
 function syncDraftUrl(pathname, draftId) {
@@ -1327,8 +1336,9 @@ function OwnerCard({
 function App({ forceStandaloneShell = false } = {}) {
   const currentPathname =
     typeof window === "undefined" ? "/" : window.location.pathname;
-  const shouldResetOnRefresh = isReloadNavigation();
-  const currentView = shouldResetOnRefresh ? "form" : getCurrentView();
+  const currentView = getCurrentView();
+  const shouldResetOnRefresh =
+    currentView === "form" && isReloadNavigation();
   const embeddedApplicationRoute = isEmbeddedApplicationRoute(currentPathname);
   const kycFabricContext = embeddedApplicationRoute || forceStandaloneShell
     ? { isKycFabricExperience: false, routeLabel: "Application" }
@@ -1337,7 +1347,9 @@ function App({ forceStandaloneShell = false } = {}) {
   const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [drafts, setDrafts] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
   const [draftListState, setDraftListState] = useState("idle");
+  const [submissionListState, setSubmissionListState] = useState("idle");
   const [connectionState, setConnectionState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
   const [submitState, setSubmitState] = useState("idle");
@@ -1354,6 +1366,7 @@ function App({ forceStandaloneShell = false } = {}) {
 
     async function bootstrapWorkspace() {
       setDraftListState("loading");
+      setSubmissionListState("loading");
       setWorkspace({
         ...mergeWorkspace(defaultWorkspace),
         activeStep: defaultWorkspace.activeStep,
@@ -1364,13 +1377,30 @@ function App({ forceStandaloneShell = false } = {}) {
       }
 
       try {
-        const draftResponse = await listWorkspaceDrafts();
+        const [draftResponse, submissionResponse] = await Promise.allSettled([
+          listWorkspaceDrafts(),
+          listSubmittedApplications(),
+        ]);
+
         if (ignore) {
           return;
         }
 
-        setDrafts(draftResponse.drafts ?? []);
-        setDraftListState("loaded");
+        if (draftResponse.status === "fulfilled") {
+          setDrafts(draftResponse.value.drafts ?? []);
+          setDraftListState("loaded");
+        } else {
+          setDrafts([]);
+          setDraftListState("error");
+        }
+
+        if (submissionResponse.status === "fulfilled") {
+          setSubmissions(submissionResponse.value.submissions ?? []);
+          setSubmissionListState("loaded");
+        } else {
+          setSubmissions([]);
+          setSubmissionListState("error");
+        }
 
         if (requestedDraftId) {
           const loadedWorkspace = await loadWorkspace(requestedDraftId);
@@ -1401,6 +1431,7 @@ function App({ forceStandaloneShell = false } = {}) {
 
         setConnectionState("fallback");
         setDraftListState("error");
+        setSubmissionListState("error");
         setStatusMessage(
           error?.payload?.code === "draft_not_found"
             ? "The requested draft link could not be found. A fresh application has been opened instead."
@@ -1417,14 +1448,22 @@ function App({ forceStandaloneShell = false } = {}) {
     };
   }, [currentPathname, requestedDraftId, shouldResetOnRefresh]);
 
+  const applicationBasePath = currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
+    ? KYC_FABRIC_APPLICATION_PATH
+    : "/";
   const draftBrowserUrl = buildDraftBrowserPath(currentPathname);
-  const customerAccountOpeningUrl = buildDraftPath(
-    currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
-      ? KYC_FABRIC_APPLICATION_PATH
-      : "/",
-    workspace.draftId,
-  );
+  const submittedApplicationsUrl = buildSubmittedApplicationsPath(currentPathname);
+  const customerAccountOpeningUrl = buildDraftPath(applicationBasePath, workspace.draftId);
   const latestDraft = drafts[0] ?? null;
+  const latestSubmission = submissions[0] ?? null;
+  const isDraftBrowserView = currentView === "drafts";
+  const isSubmittedApplicationsView = currentView === "submitted";
+  const submittedReadyCount = submissions.filter(
+    (submission) => submission.overallDecision === "ready_for_bank_review",
+  ).length;
+  const submittedReviewCount = submissions.filter(
+    (submission) => submission.kycStatus === "review",
+  ).length;
 
   const currentStep =
     workspace.steps.find((step) => step.id === workspace.activeStep) ??
@@ -1813,6 +1852,16 @@ function App({ forceStandaloneShell = false } = {}) {
     }
   }
 
+  async function refreshSubmissionList() {
+    try {
+      const submissionResponse = await listSubmittedApplications();
+      setSubmissions(submissionResponse.submissions ?? []);
+      setSubmissionListState("loaded");
+    } catch {
+      setSubmissionListState("error");
+    }
+  }
+
   async function handleRetrieveDraft(draftId) {
     setStatusMessage("Retrieving the selected draft...");
 
@@ -2161,6 +2210,7 @@ function App({ forceStandaloneShell = false } = {}) {
       const mergedWorkspace = mergeWorkspace(submittedWorkspace);
       syncDraftUrl(currentPathname, mergedWorkspace.draftId);
       await refreshDraftList();
+      await refreshSubmissionList();
 
       setConnectionState("connected");
       setSaveState("saved");
@@ -3019,6 +3069,244 @@ function App({ forceStandaloneShell = false } = {}) {
     );
   }
 
+  function renderSubmittedApplications() {
+    return (
+      <section className="submitted-browser">
+        <div className="draft-browser-header">
+          <p className="section-eyebrow">Submitted applications</p>
+          <h2>Submitted customer onboarding cases</h2>
+          <p>
+            Review completed onboarding submissions, including the current KYC
+            status and recommended next action.
+          </p>
+        </div>
+
+        {submissionListState === "loading" ? (
+          <div className="draft-browser-empty">
+            <p>Loading submitted applications...</p>
+          </div>
+        ) : submissionListState === "error" ? (
+          <div className="draft-browser-empty">
+            <p>Submitted applications are temporarily unavailable right now.</p>
+          </div>
+        ) : submissions.length ? (
+          <div className="submitted-browser-grid">
+            {submissions.map((submission) => (
+              <article
+                key={submission.submissionId}
+                className="submitted-application-card"
+              >
+                <div className="submitted-application-header">
+                  <div>
+                    <p className="section-eyebrow">{submission.submissionId}</p>
+                    <h3>{submission.entityLabel}</h3>
+                  </div>
+                  <p className="submitted-application-timestamp">
+                    Submitted {formatTimestamp(submission.submittedAt)}
+                  </p>
+                </div>
+
+                <div className="submitted-application-metrics">
+                  <div className="submitted-application-metric">
+                    <span>KYC status</span>
+                    <strong>{formatDecision(submission.kycStatus)}</strong>
+                  </div>
+                  <div className="submitted-application-metric">
+                    <span>Overall decision</span>
+                    <strong>{formatDecision(submission.overallDecision)}</strong>
+                  </div>
+                </div>
+
+                <p className="submitted-application-copy">
+                  {submission.kycSummary}
+                </p>
+                <p className="submitted-application-copy subtle">
+                  {submission.recommendedAction}
+                </p>
+
+                <div className="draft-browser-actions">
+                  {submission.retrievalUrl ? (
+                    <a className="secondary-button draft-action-button" href={submission.retrievalUrl}>
+                      Open application
+                    </a>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="draft-browser-empty">
+            <p>No submitted applications yet. Submit an onboarding application to see it here.</p>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  function renderApplicationSidebar() {
+    return (
+      <>
+        <div className="summary-card">
+          <p className="section-eyebrow">Application overview</p>
+          <h3>Submission readiness</h3>
+          <div className="progress-bar">
+            <span style={{ width: `${completionPercentage}%` }} />
+          </div>
+          <p className="progress-copy">
+            {completedSections} of {workspace.steps.length} sections completed
+          </p>
+        </div>
+
+        <div className="summary-card">
+          <p className="section-eyebrow">Draft mode</p>
+          <h3>Latest draft version</h3>
+          {draftListState === "loading" ? (
+            <p className="progress-copy">Loading latest draft...</p>
+          ) : draftListState === "error" ? (
+            <p className="progress-copy">
+              Saved drafts are temporarily unavailable. You can still continue with the form.
+            </p>
+          ) : latestDraft ? (
+            <div className={`draft-list-item${workspace.draftId === latestDraft.draftId ? " active" : ""}`}>
+              <span>{latestDraft.entityLabel}</span>
+              <strong>{formatTimestamp(latestDraft.updatedAt)}</strong>
+              <div className="draft-list-actions">
+                <button
+                  type="button"
+                  className="secondary-button draft-action-button"
+                  onClick={() => handleRetrieveDraft(latestDraft.draftId)}
+                >
+                  Retrieve draft
+                </button>
+                <a className="draft-inline-link" href={draftBrowserUrl}>
+                  Open link
+                </a>
+              </div>
+            </div>
+          ) : (
+            <p className="progress-copy">
+              No saved drafts yet. Start entering entity details and save a draft to see it here.
+            </p>
+          )}
+        </div>
+
+        <div className="summary-card">
+          <p className="section-eyebrow">Snapshot</p>
+          <div className="summary-rows">
+            <div className="summary-row">
+              <span>Applicant</span>
+              <strong>
+                {workspace.companyInfo.legalName || "Not provided yet"}
+              </strong>
+            </div>
+            <div className="summary-row">
+              <span>Primary contact</span>
+              <strong>
+                {workspace.primaryContact.fullName || "Not provided yet"}
+              </strong>
+            </div>
+            <div className="summary-row">
+              <span>Products selected</span>
+              <strong>{workspace.bankingProfile.requestedProducts.length}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Owners listed</span>
+              <strong>{workspace.beneficialOwners.length}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Documents marked ready</span>
+              <strong>{Object.values(workspace.documents).filter(Boolean).length}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Orchestrator decision</span>
+              <strong>{formatDecision(workspace.submission.overallDecision)}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <p className="section-eyebrow">Review pipeline</p>
+          <h3>Orchestrator checks</h3>
+          <div className="summary-rows">
+            {orchestrationChecks.map((check) => (
+              <div key={check.key} className="summary-row">
+                <span>{check.label}</span>
+                <strong>{formatDecision(check.decision)}</strong>
+              </div>
+            ))}
+          </div>
+          <p className="progress-copy">{workspace.orchestration.summary}</p>
+        </div>
+      </>
+    );
+  }
+
+  function renderSubmittedSidebar() {
+    return (
+      <>
+        <div className="summary-card">
+          <p className="section-eyebrow">Submitted queue</p>
+          <h3>{submissions.length} applications</h3>
+          <div className="summary-rows">
+            <div className="summary-row">
+              <span>Ready for bank review</span>
+              <strong>{submittedReadyCount}</strong>
+            </div>
+            <div className="summary-row">
+              <span>KYC review flagged</span>
+              <strong>{submittedReviewCount}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <p className="section-eyebrow">Latest submission</p>
+          <h3>{latestSubmission?.entityLabel ?? "No submissions yet"}</h3>
+          <div className="summary-rows">
+            <div className="summary-row">
+              <span>Submitted</span>
+              <strong>{formatTimestamp(latestSubmission?.submittedAt)}</strong>
+            </div>
+            <div className="summary-row">
+              <span>KYC status</span>
+              <strong>{formatDecision(latestSubmission?.kycStatus)}</strong>
+            </div>
+            <div className="summary-row">
+              <span>Decision</span>
+              <strong>{formatDecision(latestSubmission?.overallDecision)}</strong>
+            </div>
+          </div>
+          {latestSubmission?.recommendedAction ? (
+            <p className="progress-copy">{latestSubmission.recommendedAction}</p>
+          ) : null}
+        </div>
+
+        <div className="summary-card">
+          <p className="section-eyebrow">Navigation</p>
+          <h3>Customer onboarding</h3>
+          <div className="summary-rows">
+            <div className="summary-row">
+              <span>Onboarding application</span>
+              <strong>
+                <a className="draft-inline-link" href={customerAccountOpeningUrl}>
+                  Open form
+                </a>
+              </strong>
+            </div>
+            <div className="summary-row">
+              <span>Draft applications</span>
+              <strong>
+                <a className="draft-inline-link" href={draftBrowserUrl}>
+                  Open drafts
+                </a>
+              </strong>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div
       className={`application-shell${
@@ -3060,12 +3348,32 @@ function App({ forceStandaloneShell = false } = {}) {
             </div>
             {isMenuExpanded ? (
               <nav className="workspace-switcher" aria-label="Workspace navigation">
-                <a
-                  className={`workspace-link${!kycFabricContext.isKycFabricExperience ? " active" : ""}`}
-                  href={customerAccountOpeningUrl}
-                >
-                  <span className="workspace-link-label">Customer Account Onboarding</span>
-                </a>
+                <div className={`workspace-link workspace-link-group${!kycFabricContext.isKycFabricExperience ? " active" : ""}`}>
+                  <span className="workspace-link-label">Customer Onboarding</span>
+                  <span className="workspace-link-detail">
+                    Open the onboarding form, review submitted applications, or resume saved drafts.
+                  </span>
+                  <div className="workspace-submenu">
+                    <a
+                      className={`workspace-sublink${!kycFabricContext.isKycFabricExperience && !isDraftBrowserView && !isSubmittedApplicationsView ? " active" : ""}`}
+                      href={customerAccountOpeningUrl}
+                    >
+                      Onboarding application
+                    </a>
+                    <a
+                      className={`workspace-sublink${isSubmittedApplicationsView ? " active" : ""}`}
+                      href={submittedApplicationsUrl}
+                    >
+                      Submitted applications
+                    </a>
+                    <a
+                      className={`workspace-sublink${isDraftBrowserView ? " active" : ""}`}
+                      href={draftBrowserUrl}
+                    >
+                      Draft applications
+                    </a>
+                  </div>
+                </div>
                 <a
                   className={`workspace-link${kycFabricContext.isKycFabricExperience ? " active" : ""}`}
                   href={KYC_FABRIC_URL}
@@ -3078,8 +3386,10 @@ function App({ forceStandaloneShell = false } = {}) {
         </div>
 
         <main className={`form-stage${workspace.activeStep === "company" ? " form-stage-light" : ""}`}>
-          {currentView === "drafts" ? (
+          {isDraftBrowserView ? (
             renderDraftBrowser()
+          ) : isSubmittedApplicationsView ? (
+            renderSubmittedApplications()
           ) : (
             <>
           <section className="stage-banner">
@@ -3170,97 +3480,7 @@ function App({ forceStandaloneShell = false } = {}) {
         </main>
 
         <aside className="summary-panel summary-panel-light">
-          <div className="summary-card">
-            <p className="section-eyebrow">Application overview</p>
-            <h3>Submission readiness</h3>
-            <div className="progress-bar">
-              <span style={{ width: `${completionPercentage}%` }} />
-            </div>
-            <p className="progress-copy">
-              {completedSections} of {workspace.steps.length} sections completed
-            </p>
-          </div>
-
-          <div className="summary-card">
-            <p className="section-eyebrow">Draft mode</p>
-            <h3>Latest draft version</h3>
-            {draftListState === "loading" ? (
-              <p className="progress-copy">Loading latest draft...</p>
-            ) : draftListState === "error" ? (
-              <p className="progress-copy">
-                Saved drafts are temporarily unavailable. You can still continue with the form.
-              </p>
-            ) : latestDraft ? (
-              <div className={`draft-list-item${workspace.draftId === latestDraft.draftId ? " active" : ""}`}>
-                <span>{latestDraft.entityLabel}</span>
-                <strong>{formatTimestamp(latestDraft.updatedAt)}</strong>
-                <div className="draft-list-actions">
-                  <button
-                    type="button"
-                    className="secondary-button draft-action-button"
-                    onClick={() => handleRetrieveDraft(latestDraft.draftId)}
-                  >
-                    Retrieve draft
-                  </button>
-                  <a className="draft-inline-link" href={draftBrowserUrl}>
-                    Open link
-                  </a>
-                </div>
-              </div>
-            ) : (
-              <p className="progress-copy">
-                No saved drafts yet. Start entering entity details and save a draft to see it here.
-              </p>
-            )}
-          </div>
-
-          <div className="summary-card">
-            <p className="section-eyebrow">Snapshot</p>
-            <div className="summary-rows">
-              <div className="summary-row">
-                <span>Applicant</span>
-                <strong>
-                  {workspace.companyInfo.legalName || "Not provided yet"}
-                </strong>
-              </div>
-              <div className="summary-row">
-                <span>Primary contact</span>
-                <strong>
-                  {workspace.primaryContact.fullName || "Not provided yet"}
-                </strong>
-              </div>
-              <div className="summary-row">
-                <span>Products selected</span>
-                <strong>{workspace.bankingProfile.requestedProducts.length}</strong>
-              </div>
-              <div className="summary-row">
-                <span>Owners listed</span>
-                <strong>{workspace.beneficialOwners.length}</strong>
-              </div>
-              <div className="summary-row">
-                <span>Documents marked ready</span>
-                <strong>{Object.values(workspace.documents).filter(Boolean).length}</strong>
-              </div>
-              <div className="summary-row">
-                <span>Orchestrator decision</span>
-                <strong>{formatDecision(workspace.submission.overallDecision)}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="summary-card">
-            <p className="section-eyebrow">Review pipeline</p>
-            <h3>Orchestrator checks</h3>
-            <div className="summary-rows">
-              {orchestrationChecks.map((check) => (
-                <div key={check.key} className="summary-row">
-                  <span>{check.label}</span>
-                  <strong>{formatDecision(check.decision)}</strong>
-                </div>
-              ))}
-            </div>
-            <p className="progress-copy">{workspace.orchestration.summary}</p>
-          </div>
+          {isSubmittedApplicationsView ? renderSubmittedSidebar() : renderApplicationSidebar()}
         </aside>
       </div>
 

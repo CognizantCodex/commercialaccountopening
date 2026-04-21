@@ -272,6 +272,62 @@ function listDrafts() {
     .filter((draft) => draft.status === "draft");
 }
 
+function buildSubmissionSummary(workspace = {}, orchestrationResult = {}, submittedAt, submissionId) {
+  const draftSummary = buildDraftSummary(workspace, submittedAt);
+  const kycCheck =
+    orchestrationResult.orchestration?.checks?.kyc ??
+    workspace.orchestration?.checks?.kyc ??
+    null;
+
+  return {
+    submissionId:
+      submissionId ??
+      orchestrationResult.submission?.referenceId ??
+      workspace.submission?.referenceId ??
+      null,
+    draftId: workspace.draftId ?? null,
+    entityKey: draftSummary.entityKey,
+    entityLabel: draftSummary.entityLabel,
+    legalName: draftSummary.legalName,
+    taxId: draftSummary.taxId,
+    submittedAt:
+      submittedAt ??
+      orchestrationResult.submission?.submittedAt ??
+      workspace.submission?.submittedAt ??
+      null,
+    overallDecision:
+      orchestrationResult.submission?.overallDecision ??
+      workspace.submission?.overallDecision ??
+      "pending",
+    kycStatus: kycCheck?.decision ?? kycCheck?.status ?? "pending",
+    kycSummary: kycCheck?.summary ?? "KYC review is pending.",
+    recommendedAction:
+      orchestrationResult.submission?.recommendedAction ??
+      workspace.submission?.recommendedAction ??
+      "",
+    retrievalUrl: workspace.draftId ? `/?draft=${workspace.draftId}` : "",
+  };
+}
+
+function listSubmittedApplications() {
+  const rows = db
+    .prepare(`
+      SELECT submission_id, submission_payload, orchestration_result, submitted_at
+      FROM application_submissions
+      ORDER BY datetime(submitted_at) DESC
+    `)
+    .all();
+
+  return rows.map((row) =>
+    buildSubmissionSummary(
+      ensureWorkspaceMetadata(JSON.parse(row.submission_payload)),
+      JSON.parse(row.orchestration_result),
+      row.submitted_at,
+      row.submission_id,
+    ),
+  );
+}
+
 function saveWorkspace(workspace, requestedDraftId = "") {
   const timestamp = new Date().toISOString();
   const entityKey = deriveEntityKey(workspace);
@@ -1243,6 +1299,13 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/account-opening/drafts") {
       const result = json({ drafts: listDrafts() });
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/account-opening/submissions") {
+      const result = json({ submissions: listSubmittedApplications() });
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;
