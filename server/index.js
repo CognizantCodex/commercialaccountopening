@@ -460,6 +460,177 @@ function mapDecisionToStatus(overallDecision) {
   }
 }
 
+function mapDecisionToAlertSeverity(overallDecision) {
+  switch (overallDecision) {
+    case "manual_review":
+      return "critical";
+    case "enhanced_review":
+      return "warning";
+    default:
+      return "info";
+  }
+}
+
+function mapDecisionToMonitoringTitle(overallDecision) {
+  switch (overallDecision) {
+    case "manual_review":
+      return "Enhanced due diligence watch opened";
+    case "enhanced_review":
+      return "Follow-up monitoring watch opened";
+    default:
+      return "Bank review monitoring watch opened";
+  }
+}
+
+function mapDecisionToMonitoringDescription(overallDecision, recommendedAction, riskScore) {
+  switch (overallDecision) {
+    case "manual_review":
+      return `${recommendedAction} The monitoring layer elevated this submission because the risk profile is ${riskScore}.`;
+    case "enhanced_review":
+      return `${recommendedAction} Monitoring remains active while review items are cleared.`;
+    default:
+      return `${recommendedAction} The monitoring layer will keep screening the entity while it waits for bank review.`;
+  }
+}
+
+function mapDecisionToFalsePositiveRisk(overallDecision) {
+  switch (overallDecision) {
+    case "manual_review":
+      return 12;
+    case "enhanced_review":
+      return 21;
+    default:
+      return 34;
+  }
+}
+
+function mapDecisionToGovernanceDecision(overallDecision) {
+  switch (overallDecision) {
+    case "manual_review":
+      return "flagged";
+    case "enhanced_review":
+      return "escalated";
+    default:
+      return "approved";
+  }
+}
+
+function mapDecisionToGovernanceTitle(overallDecision) {
+  switch (overallDecision) {
+    case "manual_review":
+      return "Manual review decision logged";
+    case "enhanced_review":
+      return "Enhanced review decision logged";
+    default:
+      return "Straight-through recommendation logged";
+  }
+}
+
+function buildGovernanceSources(caseId, workspace, orchestrationResult) {
+  const checks = Object.values(orchestrationResult.orchestration?.checks ?? {});
+  const uploadedDocuments = (workspace.documentOptions ?? [])
+    .filter((document) => workspace.documents?.[document.key])
+    .slice(0, 2)
+    .map((document, index) => ({
+      id: `${caseId}-source-document-${index + 1}`,
+      label: document.title,
+      type: "document",
+      confidence: 92,
+      excerpt: `${document.title} was attached to the submitted onboarding package.`,
+    }));
+
+  const integrationSources = [
+    orchestrationResult.orchestration?.integrations?.checkKyc
+      ? {
+          id: `${caseId}-source-screening`,
+          label: "CheckKYC screening response",
+          type: "screening",
+          confidence: 89,
+          excerpt: "The CheckKYC integration response was attached to the explainability record.",
+        }
+      : null,
+    {
+      id: `${caseId}-source-registry`,
+      label: workspace.companyInfo?.registrationNumber
+        ? `Registration ${workspace.companyInfo.registrationNumber}`
+        : "Corporate registration profile",
+      type: "registry",
+      confidence: 87,
+      excerpt: "Entity registration and incorporation metadata were used during orchestration.",
+    },
+    checks.length
+      ? {
+          id: `${caseId}-source-advisor-note`,
+          label: "Orchestration recommendation",
+          type: "advisor-note",
+          confidence: 84,
+          excerpt:
+            orchestrationResult.submission?.recommendedAction ||
+            "The orchestration layer recorded the recommended next action.",
+        }
+      : null,
+  ].filter(Boolean);
+
+  return [...uploadedDocuments, ...integrationSources];
+}
+
+function buildSubmittedMonitoringAlert(caseRecord, clientRecord, orchestrationResult) {
+  const submittedAt = orchestrationResult.submission?.submittedAt || new Date().toISOString();
+  const overallDecision = orchestrationResult.submission?.overallDecision;
+  const recommendedAction =
+    orchestrationResult.submission?.recommendedAction ||
+    "Continue the onboarding review.";
+
+  return {
+    id: `${caseRecord.id}-alert-primary`,
+    caseId: caseRecord.id,
+    clientId: clientRecord.id,
+    title: mapDecisionToMonitoringTitle(overallDecision),
+    severity: mapDecisionToAlertSeverity(overallDecision),
+    region: clientRecord.region,
+    coordinates: clientRecord.coordinates,
+    eventTime: new Date(Date.parse(submittedAt) + 120_000).toISOString(),
+    falsePositiveRisk: mapDecisionToFalsePositiveRisk(overallDecision),
+    description: mapDecisionToMonitoringDescription(
+      overallDecision,
+      recommendedAction,
+      caseRecord.riskScore,
+    ),
+  };
+}
+
+function buildSubmittedDecisionLog(caseRecord, workspace, orchestrationResult) {
+  const submittedAt = orchestrationResult.submission?.submittedAt || new Date().toISOString();
+  const overallDecision = orchestrationResult.submission?.overallDecision;
+  const checks = Object.values(orchestrationResult.orchestration?.checks ?? {});
+
+  return {
+    id: `${caseRecord.id}-decision-primary`,
+    caseId: caseRecord.id,
+    title: mapDecisionToGovernanceTitle(overallDecision),
+    actor:
+      overallDecision === "ready_for_bank_review"
+        ? "AI Governance Agent"
+        : "Governance Auditor",
+    decision: mapDecisionToGovernanceDecision(overallDecision),
+    confidence: Math.max(55, Math.min(98, 100 - caseRecord.riskScore)),
+    overrideReason:
+      overallDecision === "manual_review"
+        ? orchestrationResult.submission?.recommendedAction
+        : undefined,
+    createdAt: new Date(Date.parse(submittedAt) + 180_000).toISOString(),
+    reasoningChain: [
+      orchestrationResult.submission?.summary ||
+        "The submitted application was evaluated by the orchestration layer.",
+      ...checks.slice(0, 3).map(
+        (check) => `${check.label}: ${check.summary || "Completed without additional detail."}`,
+      ),
+      "The explainability record preserves the final recommendation, source evidence, and next action.",
+    ],
+    sources: buildGovernanceSources(caseRecord.id, workspace, orchestrationResult),
+  };
+}
+
 function mapCheckDecisionToRuleStatus(decision) {
   switch (decision) {
     case "escalate":
@@ -596,6 +767,16 @@ function buildSubmittedTimelineEvents(caseRecord, workspace, orchestrationResult
   const overallDecision = orchestrationResult.submission?.overallDecision;
   const baseTimestamp = Date.parse(submittedAt);
   const documentCount = caseRecord.documents.length;
+  const monitoringAlert = buildSubmittedMonitoringAlert(
+    caseRecord,
+    clientRecord,
+    orchestrationResult,
+  );
+  const decisionLog = buildSubmittedDecisionLog(
+    caseRecord,
+    workspace,
+    orchestrationResult,
+  );
   const timeline = [
     {
       id: `${caseId}-timeline-1`,
@@ -620,6 +801,40 @@ function buildSubmittedTimelineEvents(caseRecord, workspace, orchestrationResult
       caseId,
       clientId,
       routeHint: "agents",
+    },
+    {
+      id: `${caseId}-timeline-4`,
+      timeOffsetMs: 120_000,
+      timestamp: monitoringAlert.eventTime,
+      type: "monitoring_alert",
+      title: monitoringAlert.title,
+      description: monitoringAlert.description,
+      severity: monitoringAlert.severity,
+      caseId,
+      clientId,
+      routeHint: "monitoring",
+      payload: {
+        falsePositiveRisk: monitoringAlert.falsePositiveRisk,
+      },
+    },
+    {
+      id: `${caseId}-timeline-5`,
+      timeOffsetMs: 180_000,
+      timestamp: decisionLog.createdAt,
+      type: "governance_logged",
+      title: decisionLog.title,
+      description:
+        decisionLog.overrideReason ||
+        `${decisionLog.actor} recorded ${decisionLog.decision} for the submitted application.`,
+      severity: decisionLog.decision === "approved" ? "success" : "warning",
+      caseId,
+      clientId,
+      routeHint: "governance",
+      payload: {
+        decision: decisionLog.decision,
+        confidence: decisionLog.confidence,
+        primarySourceLabel: decisionLog.sources[0]?.label ?? "Submitted application package",
+      },
     },
   ];
 
@@ -646,10 +861,16 @@ function buildSubmittedTimelineEvents(caseRecord, workspace, orchestrationResult
   return timeline;
 }
 
-function buildSubmittedActivityFeed(caseRecord, orchestrationResult) {
+function buildSubmittedActivityFeed(caseRecord, workspace, clientRecord, orchestrationResult) {
   const submittedAt = orchestrationResult.submission?.submittedAt || new Date().toISOString();
   const completedAt = orchestrationResult.orchestration?.completedAt || submittedAt;
   const overallDecision = orchestrationResult.submission?.overallDecision;
+  const monitoringAlert = buildSubmittedMonitoringAlert(
+    caseRecord,
+    clientRecord,
+    orchestrationResult,
+  );
+  const decisionLog = buildSubmittedDecisionLog(caseRecord, workspace, orchestrationResult);
 
   return [
     {
@@ -674,6 +895,24 @@ function buildSubmittedActivityFeed(caseRecord, orchestrationResult) {
       timestamp: completedAt,
       severity: overallDecision === "manual_review" ? "warning" : "success",
       routeHint: "cases",
+    },
+    {
+      id: `${caseRecord.id}-activity-3`,
+      title: monitoringAlert.title,
+      description: monitoringAlert.description,
+      timestamp: monitoringAlert.eventTime,
+      severity: monitoringAlert.severity,
+      routeHint: "monitoring",
+    },
+    {
+      id: `${caseRecord.id}-activity-4`,
+      title: decisionLog.title,
+      description:
+        decisionLog.overrideReason ||
+        `${decisionLog.actor} recorded ${decisionLog.decision} for the submitted application.`,
+      timestamp: decisionLog.createdAt,
+      severity: decisionLog.decision === "approved" ? "success" : "warning",
+      routeHint: "governance",
     },
   ];
 }
@@ -738,8 +977,97 @@ function buildSubmittedCaseRecord(workspace, orchestrationResult) {
     nextBestAction:
       orchestrationResult.submission?.recommendedAction ||
       "Review the submitted onboarding package.",
+    intakeForm: {
+      brandName: workspace.brandName || "Harbor Commercial",
+      formTitle: workspace.formTitle || "Corporate Account Opening Application",
+      companyInfo: {
+        legalName: workspace.companyInfo?.legalName || "",
+        tradingName: workspace.companyInfo?.tradingName || "",
+        entityType: workspace.companyInfo?.entityType || "",
+        registrationNumber: workspace.companyInfo?.registrationNumber || "",
+        taxId: workspace.companyInfo?.taxId || "",
+        incorporationDate: workspace.companyInfo?.incorporationDate || "",
+        incorporationState: workspace.companyInfo?.incorporationState || "",
+        incorporationCountry: workspace.companyInfo?.incorporationCountry || "",
+        industry: workspace.companyInfo?.industry || "",
+        website: workspace.companyInfo?.website || "",
+        annualRevenue: String(workspace.companyInfo?.annualRevenue ?? ""),
+        employeeCount: String(workspace.companyInfo?.employeeCount ?? ""),
+      },
+      primaryContact: {
+        fullName: workspace.primaryContact?.fullName || "",
+        title: workspace.primaryContact?.title || "",
+        email: workspace.primaryContact?.email || "",
+        phone: workspace.primaryContact?.phone || "",
+        extension: workspace.primaryContact?.extension || "",
+      },
+      addresses: {
+        registeredLine1: workspace.addresses?.registeredLine1 || "",
+        registeredLine2: workspace.addresses?.registeredLine2 || "",
+        city: workspace.addresses?.city || "",
+        state: workspace.addresses?.state || "",
+        postalCode: workspace.addresses?.postalCode || "",
+        country: workspace.addresses?.country || "",
+        operatingSameAsRegistered: Boolean(workspace.addresses?.operatingSameAsRegistered),
+        operatingLine1: workspace.addresses?.operatingLine1 || "",
+        operatingLine2: workspace.addresses?.operatingLine2 || "",
+        operatingCity: workspace.addresses?.operatingCity || "",
+        operatingState: workspace.addresses?.operatingState || "",
+        operatingPostalCode: workspace.addresses?.operatingPostalCode || "",
+        operatingCountry: workspace.addresses?.operatingCountry || "",
+      },
+      bankingProfile: {
+        accountPurpose: workspace.bankingProfile?.accountPurpose || "",
+        requestedProducts: workspace.bankingProfile?.requestedProducts || [],
+        expectedOpeningDeposit: String(
+          workspace.bankingProfile?.expectedOpeningDeposit ?? "",
+        ),
+        monthlyIncoming: String(workspace.bankingProfile?.monthlyIncoming ?? ""),
+        monthlyOutgoing: String(workspace.bankingProfile?.monthlyOutgoing ?? ""),
+        onlineBankingUsers: String(workspace.bankingProfile?.onlineBankingUsers ?? ""),
+        internationalActivity: Boolean(workspace.bankingProfile?.internationalActivity),
+        jurisdictionsInScope: workspace.bankingProfile?.jurisdictionsInScope || "",
+        needsCommercialCards: Boolean(workspace.bankingProfile?.needsCommercialCards),
+      },
+      beneficialOwners: (workspace.beneficialOwners || []).map((owner, index) => ({
+        id: owner.id || `${caseId}-owner-${index + 1}`,
+        fullName: owner.fullName || "",
+        title: owner.title || "",
+        ownershipPercentage: String(owner.ownershipPercentage ?? ""),
+        email: owner.email || "",
+        phone: owner.phone || "",
+        isAuthorizedSigner: Boolean(owner.isAuthorizedSigner),
+      })),
+      documents: {
+        certificateOfFormation: Boolean(workspace.documents?.certificateOfFormation),
+        taxIdLetter: Boolean(workspace.documents?.taxIdLetter),
+        ownershipChart: Boolean(workspace.documents?.ownershipChart),
+        boardResolution: Boolean(workspace.documents?.boardResolution),
+        signerIdentification: Boolean(workspace.documents?.signerIdentification),
+        addressProof: Boolean(workspace.documents?.addressProof),
+      },
+      declarations: {
+        certifyAuthority: Boolean(workspace.declarations?.certifyAuthority),
+        certifyBeneficialOwners: Boolean(
+          workspace.declarations?.certifyBeneficialOwners,
+        ),
+        confirmTaxCompliance: Boolean(workspace.declarations?.confirmTaxCompliance),
+        confirmTerms: Boolean(workspace.declarations?.confirmTerms),
+      },
+      additionalNotes: workspace.additionalNotes || "",
+    },
     ownershipGraph: buildSubmittedOwnershipGraph(workspace, caseId),
   };
+  const monitoringAlert = buildSubmittedMonitoringAlert(
+    caseRecord,
+    clientRecord,
+    orchestrationResult,
+  );
+  const decisionLog = buildSubmittedDecisionLog(
+    caseRecord,
+    workspace,
+    orchestrationResult,
+  );
 
   return {
     clients: [clientRecord],
@@ -750,9 +1078,14 @@ function buildSubmittedCaseRecord(workspace, orchestrationResult) {
       orchestrationResult,
       clientRecord,
     ),
-    activityFeed: buildSubmittedActivityFeed(caseRecord, orchestrationResult),
-    alerts: [],
-    decisionLogs: [],
+    activityFeed: buildSubmittedActivityFeed(
+      caseRecord,
+      workspace,
+      clientRecord,
+      orchestrationResult,
+    ),
+    alerts: [monitoringAlert],
+    decisionLogs: [decisionLog],
   };
 }
 
@@ -910,6 +1243,16 @@ const server = createServer(async (request, response) => {
 
     if (request.method === "GET" && url.pathname === "/api/account-opening/drafts") {
       const result = json({ drafts: listDrafts() });
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "GET" &&
+      url.pathname === "/api/platform/snapshot"
+    ) {
+      const result = json(buildAccountOpeningPlatformSnapshot());
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;

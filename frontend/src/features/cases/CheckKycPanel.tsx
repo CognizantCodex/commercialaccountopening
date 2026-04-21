@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { platformApi } from '@/services/platform-api';
+import { usePlatformStore } from '@/store';
+import { getSelectedCase } from '@/services/selectors';
 import type { CheckKycRequest, CheckKycResponse } from '@/types/platform';
 import { checkKycPayload } from './check-kyc-payload';
 
@@ -52,11 +54,125 @@ function SectionTitle({ title }: { title: string }) {
   return <h4 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--foreground)]">{title}</h4>;
 }
 
+function titleCaseWords(value: string) {
+  return value
+    .split(/[\s/-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function buildDerivedPayload(selectedCase: NonNullable<ReturnType<typeof getSelectedCase>>, selectedClient?: { name: string; headquarters: string; sector: string; annualRevenueUsd: number }) {
+  const advisorNode =
+    selectedCase.ownershipGraph.nodes.find((node) => node.group === 'advisor') ?? null;
+  const ownerNodes = selectedCase.ownershipGraph.nodes.filter(
+    (node) => node.group === 'beneficial-owner',
+  );
+  const jurisdictionParts = selectedCase.jurisdiction.split('/').map((value) => value.trim());
+  const [incorporationCountry = selectedCase.jurisdiction, operatingCountry = incorporationCountry] =
+    jurisdictionParts;
+  const [city = selectedClient?.headquarters ?? '', state = ''] =
+    (selectedClient?.headquarters ?? '').split(',').map((part) => part.trim());
+
+  const documentKeys = selectedCase.documents.map((document) => document.type.toLowerCase());
+  const qcText = selectedCase.qcRules.map((rule) => `${rule.label}: ${rule.rationale}`).join(' ');
+
+  return {
+    brandName: 'Harbor Commercial',
+    formTitle: 'Corporate Account Opening Application',
+    companyInfo: {
+      legalName: selectedClient?.name ?? selectedCase.caseName,
+      tradingName: selectedClient?.name ?? selectedCase.caseName,
+      entityType: 'Corporation',
+      registrationNumber: selectedCase.id.toUpperCase(),
+      taxId: '',
+      incorporationDate: '',
+      incorporationState: state,
+      incorporationCountry,
+      industry: selectedClient?.sector ?? 'Corporate Services',
+      website: '',
+      annualRevenue: selectedClient?.annualRevenueUsd
+        ? String(selectedClient.annualRevenueUsd)
+        : '',
+      employeeCount: '',
+    },
+    primaryContact: {
+      fullName: advisorNode?.name ?? selectedCase.assignedTo,
+      title: advisorNode?.role ?? 'Case advisor',
+      email: '',
+      phone: '',
+      extension: '',
+    },
+    addresses: {
+      registeredLine1: '',
+      registeredLine2: '',
+      city,
+      state,
+      postalCode: '',
+      country: incorporationCountry,
+      operatingSameAsRegistered: incorporationCountry === operatingCountry,
+      operatingLine1: '',
+      operatingLine2: '',
+      operatingCity: city,
+      operatingState: state,
+      operatingPostalCode: '',
+      operatingCountry,
+    },
+    bankingProfile: {
+      accountPurpose: selectedCase.narrative,
+      requestedProducts: ['Corporate account'],
+      expectedOpeningDeposit: '',
+      monthlyIncoming: '',
+      monthlyOutgoing: '',
+      onlineBankingUsers: '',
+      internationalActivity: jurisdictionParts.length > 1,
+      jurisdictionsInScope: selectedCase.jurisdiction,
+      needsCommercialCards: /card/i.test(qcText),
+    },
+    beneficialOwners: (ownerNodes.length ? ownerNodes : []).map((owner, index) => ({
+      id: owner.id,
+      fullName: owner.name,
+      title: owner.role,
+      ownershipPercentage: '',
+      email: '',
+      phone: '',
+      isAuthorizedSigner: index === 0,
+    })),
+    documents: {
+      certificateOfFormation: documentKeys.some((value) =>
+        /(formation|incorporation|good standing)/.test(value),
+      ),
+      taxIdLetter: documentKeys.some((value) => /(tax|ein)/.test(value)),
+      ownershipChart: documentKeys.some((value) => /(ownership|ubo)/.test(value)),
+      boardResolution: documentKeys.some((value) => /(board|resolution)/.test(value)),
+      signerIdentification: documentKeys.some((value) => /(signer|passport|identification)/.test(value)),
+      addressProof: documentKeys.some((value) => /(address|proof)/.test(value)),
+    },
+    declarations: {
+      certifyAuthority: true,
+      certifyBeneficialOwners: ownerNodes.length > 0,
+      confirmTaxCompliance: selectedCase.riskScore < 80,
+      confirmTerms: true,
+    },
+    additionalNotes: `${titleCaseWords(selectedCase.status)} case in ${selectedCase.stage}. ${selectedCase.nextBestAction}`,
+  } satisfies CheckKycRequest;
+}
+
 export function CheckKycPanel() {
   const [result, setResult] = useState<CheckKycResponse | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const payload: CheckKycRequest = checkKycPayload;
+  const selectedCase = usePlatformStore(getSelectedCase);
+  const selectedClient = usePlatformStore((state) =>
+    state.clients.find((client) => client.id === selectedCase?.clientId),
+  );
+  const payload: CheckKycRequest = useMemo(() => {
+    if (!selectedCase) {
+      return checkKycPayload;
+    }
+
+    return selectedCase.intakeForm ?? buildDerivedPayload(selectedCase, selectedClient);
+  }, [selectedCase, selectedClient]);
 
   async function handleSubmit() {
     setIsSubmitting(true);

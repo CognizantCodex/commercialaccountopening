@@ -37,6 +37,10 @@ describe('platform-api', () => {
     expect(resolveInitialDataSource()).toBe('live');
   });
 
+  it('defaults to live mode when no persisted source is present', () => {
+    expect(resolveInitialDataSource()).toBe('live');
+  });
+
   it('persists the chosen data source to both the DOM and local storage', () => {
     persistDataSource('demo');
 

@@ -57,7 +57,7 @@ export function resolveInitialDataSource(): DataSourceMode {
     }
   }
 
-  return import.meta.env.VITE_PLATFORM_DATA_SOURCE === 'live' ? 'live' : 'demo';
+  return import.meta.env.VITE_PLATFORM_DATA_SOURCE === 'demo' ? 'demo' : 'live';
 }
 
 export function persistDataSource(mode: DataSourceMode) {

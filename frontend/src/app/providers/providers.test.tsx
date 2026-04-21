@@ -38,6 +38,19 @@ describe('providers', () => {
     });
   });
 
+  it('refreshes platform data when the window regains focus', async () => {
+    const initializePlatform = vi.fn().mockResolvedValue(undefined);
+    const refreshPlatform = vi.fn().mockResolvedValue(undefined);
+    usePlatformStore.setState({ initializePlatform, refreshPlatform, dataSource: 'demo' });
+
+    renderWithProviders(<PlatformEffects />);
+    window.dispatchEvent(new Event('focus'));
+
+    await waitFor(() => {
+      expect(refreshPlatform).toHaveBeenCalledOnce();
+    });
+  });
+
   it('renders children through the provider boundary', () => {
     renderWithProviders(
       <AppProviders>

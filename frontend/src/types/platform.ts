@@ -105,6 +105,7 @@ export interface CaseRecord {
   qcRules: QcRule[];
   narrative: string;
   nextBestAction: string;
+  intakeForm?: CheckKycRequest;
   ownershipGraph: {
     nodes: OwnershipNode[];
     links: OwnershipLink[];
