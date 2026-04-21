@@ -11,7 +11,29 @@ const COUNT_DIGIT_LIMIT = 6;
 const OWNERSHIP_PERCENT_DECIMAL_LIMIT = 2;
 const OWNERSHIP_PERCENT_WHOLE_LIMIT = 3;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CUSTOMER_ACCOUNT_ONBOARDING_URL = "/";
 const KYC_FABRIC_URL = "/kyc-fabric/executive";
+const KYC_FABRIC_PATH_PREFIX = "/kyc-fabric";
+
+function formatRouteLabel(segment = "") {
+  return segment
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getKycFabricContext(pathname = "/") {
+  const isKycFabricExperience = pathname.startsWith(KYC_FABRIC_PATH_PREFIX);
+  const routeSegment = isKycFabricExperience
+    ? pathname.slice(KYC_FABRIC_PATH_PREFIX.length).replace(/^\/+/, "").split("/")[0]
+    : "";
+
+  return {
+    isKycFabricExperience,
+    routeLabel: routeSegment ? formatRouteLabel(routeSegment) : "Executive",
+  };
+}
 
 function createOwner(id = `owner-${Date.now()}`) {
   return {
@@ -1061,6 +1083,10 @@ function OwnerCard({
 }
 
 function App() {
+  const kycFabricContext = getKycFabricContext(
+    typeof window === "undefined" ? "/" : window.location.pathname,
+  );
+  const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [connectionState, setConnectionState] = useState("loading");
   const [saveState, setSaveState] = useState("idle");
@@ -1117,6 +1143,18 @@ function App() {
   const currentStep =
     workspace.steps.find((step) => step.id === workspace.activeStep) ??
     workspace.steps[0];
+  const heroBrand = kycFabricContext.isKycFabricExperience
+    ? workspace.brandName
+    : workspace.brandName;
+  const heroTitle = kycFabricContext.isKycFabricExperience
+    ? `KYC Fabric ${kycFabricContext.routeLabel}`
+    : workspace.formTitle;
+  const heroIntro = kycFabricContext.isKycFabricExperience
+    ? "A Cognizant-aligned operating surface for intake, due diligence, and onboarding decisions across every KYC checkpoint."
+    : workspace.intro;
+  const helpCopy = kycFabricContext.isKycFabricExperience
+    ? "Contact the Cognizant onboarding team at"
+    : "Contact the onboarding team at";
   const isReadOnly = workspace.submission.status === "submitted";
   const currentStepIndex = workspace.steps.findIndex(
     (step) => step.id === workspace.activeStep,
@@ -2529,21 +2567,14 @@ function App() {
   }
 
   return (
-    <div className="application-shell">
+    <div
+      className={`application-shell${kycFabricContext.isKycFabricExperience ? " kyc-fabric-shell" : ""}`}
+    >
       <header className="hero-panel">
         <div className="hero-copy">
-          <p className="brand-mark">{workspace.brandName}</p>
-          <h1>{workspace.formTitle}</h1>
-          <p>{workspace.intro}</p>
-          <div className="hero-actions">
-            <a className="hero-link" href={KYC_FABRIC_URL}>
-              Open KYC Fabric workspace
-            </a>
-            <p className="hero-link-copy">
-              Review the merged KYC Fabric experience in a dedicated intelligence
-              dashboard.
-            </p>
-          </div>
+          <p className="brand-mark">{heroBrand}</p>
+          <h1>{heroTitle}</h1>
+          <p>{heroIntro}</p>
         </div>
         <div className="hero-meta">
           <SummaryChip label="Completion" value={`${completionPercentage}%`} tone="accent" />
@@ -2553,34 +2584,45 @@ function App() {
         </div>
       </header>
 
-      <div className="workspace-layout">
-        <aside className="step-rail">
-          <div className="rail-block">
-            <p className="section-eyebrow">Application steps</p>
-            <h2>Required business information</h2>
-            <p>{statusMessage}</p>
-          </div>
-
-          <div className="step-list">
-            {workspace.steps.map((step) => (
-              <StepButton
-                key={step.id}
-                step={step}
-                active={step.id === workspace.activeStep}
-                meta={`${sectionCompletion[step.id].complete}/${sectionCompletion[step.id].total}`}
-                onClick={handleStepChange}
-              />
-            ))}
-          </div>
-
-          <div className="rail-block note-block">
-            <p className="section-eyebrow">Need help?</p>
-            <p>
-              Contact the onboarding team at <strong>{workspace.supportEmail}</strong> if
-              you need help with documentation or authorized signer requirements.
-            </p>
-          </div>
-        </aside>
+      <div
+        className={`workspace-layout${!isMenuExpanded ? " menu-collapsed" : ""}`}
+      >
+        <div className={`left-rail${!isMenuExpanded ? " collapsed" : ""}`}>
+          <aside className="workspace-panel">
+            <div className="workspace-panel-header">
+              <p className="section-eyebrow">Menu</p>
+              <button
+                type="button"
+                className="menu-toggle"
+                aria-expanded={isMenuExpanded}
+                aria-label={isMenuExpanded ? "Collapse menu" : "Expand menu"}
+                onClick={() => setIsMenuExpanded((currentValue) => !currentValue)}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+            </div>
+            {isMenuExpanded ? (
+              <nav className="workspace-switcher" aria-label="Workspace navigation">
+                <a
+                  className={`workspace-link${!kycFabricContext.isKycFabricExperience ? " active" : ""}`}
+                  href={CUSTOMER_ACCOUNT_ONBOARDING_URL}
+                >
+                  <span className="workspace-link-label">Customer Account Onboarding</span>
+                  <span className="workspace-link-detail">Default workspace</span>
+                </a>
+                <a
+                  className={`workspace-link${kycFabricContext.isKycFabricExperience ? " active" : ""}`}
+                  href={KYC_FABRIC_URL}
+                >
+                  <span className="workspace-link-label">KYC-Fabric</span>
+                  <span className="workspace-link-detail">Open KYC Fabric workspace</span>
+                </a>
+              </nav>
+            ) : null}
+          </aside>
+        </div>
 
         <main className="form-stage">
           <section className="stage-banner">
@@ -2723,26 +2765,24 @@ function App() {
             </div>
             <p className="progress-copy">{workspace.orchestration.summary}</p>
           </div>
-
-          <div className="summary-card">
-            <p className="section-eyebrow">Outstanding items</p>
-            <div className="issue-list">
-              {uniqueMissingItems.map((item) => (
-                <div key={item} className="issue-item">
-                  <span className="issue-dot" aria-hidden="true" />
-                  <p>{item}</p>
-                </div>
-              ))}
-              {!uniqueMissingItems.length ? (
-                <div className="issue-item complete">
-                  <span className="issue-dot" aria-hidden="true" />
-                  <p>The application includes the core information required for review.</p>
-                </div>
-              ) : null}
-            </div>
-          </div>
         </aside>
       </div>
+
+      <footer className="support-footer">
+        <div className="support-copy">
+          <p className="section-eyebrow">Need help?</p>
+          <h3>Talk to the onboarding support team</h3>
+          <p>
+            {kycFabricContext.isKycFabricExperience
+              ? "Reach out for document issues, signer guidance, or review escalations across the KYC Fabric workspace."
+              : "Reach out if you need help with documentation, business details, or authorized signer requirements."}
+          </p>
+        </div>
+        <a className="support-link" href={`mailto:${workspace.supportEmail}`}>
+          <span className="support-link-label">{workspace.supportEmail}</span>
+          <span className="support-link-detail">Email support</span>
+        </a>
+      </footer>
     </div>
   );
 }
