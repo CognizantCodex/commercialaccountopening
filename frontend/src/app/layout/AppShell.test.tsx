@@ -1,0 +1,53 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { AppShell } from '@/app/layout/AppShell';
+import { usePlatformStore } from '@/store';
+import { renderWithProviders, screen, waitFor } from '@/test/test-utils';
+
+function resetStore() {
+  usePlatformStore.setState(usePlatformStore.getInitialState(), true);
+}
+
+describe('AppShell', () => {
+  beforeEach(() => {
+    resetStore();
+    usePlatformStore.setState({
+      currentRoute: 'executive',
+      selectedCaseId: usePlatformStore.getState().cases[0]?.id ?? null,
+      setCommandPaletteOpen: vi.fn(),
+      themeMode: 'system',
+      dataSource: 'demo',
+    });
+  });
+
+  it('synchronizes route state, title, and shared shell chrome for the KYC workspace', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/cases']}>
+        <Routes>
+          <Route path="/" element={<AppShell />}>
+            <Route path="cases" element={<div>Case outlet</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(document.title).toBe('KYC Case Explorer | Cognizant KYC Fabric');
+    });
+
+    expect(usePlatformStore.getState().currentRoute).toBe('cases');
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(
+      'KYC Case Explorer',
+    );
+    expect(screen.getByText('Case outlet')).toBeInTheDocument();
+    expect(screen.getByText('Decision brief')).toBeInTheDocument();
+    expect(document.querySelector('[aria-live="polite"]')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /command palette/i }));
+
+    expect(usePlatformStore.getState().setCommandPaletteOpen).toHaveBeenCalledWith(true);
+  });
+});
