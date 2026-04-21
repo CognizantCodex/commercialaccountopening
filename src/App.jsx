@@ -909,6 +909,34 @@ function formatDecision(value) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function buildWorkspaceSubmissionSummary(workspace) {
+  const legalName = String(workspace.companyInfo?.legalName ?? "").trim();
+  const taxId = String(workspace.companyInfo?.taxId ?? "").trim();
+  const entityLabel =
+    legalName && taxId
+      ? `${legalName} (${taxId})`
+      : legalName || taxId || "Submitted application";
+  const kycCheck = workspace.orchestration?.checks?.kyc ?? null;
+
+  return {
+    submissionId: workspace.submission?.referenceId ?? workspace.draftId ?? "current-submission",
+    draftId: workspace.draftId ?? null,
+    entityKey: "",
+    entityLabel,
+    legalName,
+    taxId,
+    submittedAt: workspace.submission?.submittedAt ?? workspace.lastUpdatedAt ?? null,
+    overallDecision: workspace.submission?.overallDecision ?? "pending",
+    kycStatus: kycCheck?.decision ?? kycCheck?.status ?? "pending",
+    kycSummary: kycCheck?.summary ?? workspace.submission?.summary ?? "KYC review is pending.",
+    recommendedAction:
+      workspace.submission?.recommendedAction ??
+      workspace.orchestration?.summary ??
+      "",
+    retrievalUrl: workspace.draftId ? `/?draft=${workspace.draftId}` : "",
+  };
+}
+
 function StepButton({ step, active, meta, onClick }) {
   return (
     <button
@@ -1377,10 +1405,12 @@ function App({ forceStandaloneShell = false } = {}) {
       }
 
       try {
-        const [draftResponse, submissionResponse] = await Promise.allSettled([
-          listWorkspaceDrafts(),
-          listSubmittedApplications(),
-        ]);
+        const [draftResponse, submissionResponse, workspaceResponse] =
+          await Promise.allSettled([
+            listWorkspaceDrafts(),
+            listSubmittedApplications(),
+            loadWorkspace(requestedDraftId || undefined),
+          ]);
 
         if (ignore) {
           return;
@@ -1402,11 +1432,14 @@ function App({ forceStandaloneShell = false } = {}) {
           setSubmissionListState("error");
         }
 
-        if (requestedDraftId) {
-          const loadedWorkspace = await loadWorkspace(requestedDraftId);
-          if (ignore) {
-            return;
-          }
+        const canRenderSubmittedView =
+          currentView === "submitted" &&
+          (submissionResponse.status === "fulfilled" ||
+            (workspaceResponse.status === "fulfilled" &&
+              workspaceResponse.value?.submission?.status === "submitted"));
+
+        if (workspaceResponse.status === "fulfilled") {
+          const loadedWorkspace = workspaceResponse.value;
 
           setWorkspace(
             mergeWorkspace({
@@ -1414,14 +1447,37 @@ function App({ forceStandaloneShell = false } = {}) {
               activeStep: defaultWorkspace.activeStep,
             }),
           );
-          syncDraftUrl(currentPathname, loadedWorkspace.draftId);
+
+          if (requestedDraftId) {
+            syncDraftUrl(currentPathname, loadedWorkspace.draftId);
+          }
+        } else if (!canRenderSubmittedView) {
+          throw workspaceResponse.reason;
         }
 
-        setConnectionState("connected");
+        setConnectionState(
+          draftResponse.status === "fulfilled" ||
+            submissionResponse.status === "fulfilled" ||
+            workspaceResponse.status === "fulfilled"
+            ? "connected"
+            : "fallback",
+        );
         setStatusMessage(
           requestedDraftId
             ? "Saved draft retrieved. You can continue editing the corporate account opening application."
-            : "Draft mode is ready. Start a new application at step 1 or select an existing draft.",
+            : currentView === "submitted"
+              ? submissionResponse.status === "fulfilled"
+                ? "Submitted applications loaded."
+                : workspaceResponse.status === "fulfilled" &&
+                    workspaceResponse.value?.submission?.status === "submitted"
+                  ? "The latest submitted application has been loaded."
+                  : "Submitted applications are temporarily unavailable right now."
+              : currentView === "drafts"
+                ? "Saved drafts loaded. Select a draft to continue."
+                : workspaceResponse.status === "fulfilled" &&
+                    workspaceResponse.value?.submission?.status === "submitted"
+                  ? "The latest submitted application has been loaded."
+                  : "Draft mode is ready. Start a new application at step 1 or select an existing draft.",
         );
         setHasBootstrapped(true);
       } catch (error) {
@@ -1455,13 +1511,27 @@ function App({ forceStandaloneShell = false } = {}) {
   const submittedApplicationsUrl = buildSubmittedApplicationsPath(currentPathname);
   const customerAccountOpeningUrl = buildDraftPath(applicationBasePath, workspace.draftId);
   const latestDraft = drafts[0] ?? null;
-  const latestSubmission = submissions[0] ?? null;
+  const fallbackSubmission =
+    workspace.submission?.status === "submitted"
+      ? buildWorkspaceSubmissionSummary(workspace)
+      : null;
+  const visibleSubmissions =
+    submissions.length > 0
+      ? submissions
+      : fallbackSubmission
+        ? [fallbackSubmission]
+        : [];
+  const latestSubmission = visibleSubmissions[0] ?? null;
   const isDraftBrowserView = currentView === "drafts";
   const isSubmittedApplicationsView = currentView === "submitted";
-  const submittedReadyCount = submissions.filter(
+  const shouldShowHeroMeta =
+    !isDraftBrowserView && !isSubmittedApplicationsView;
+  const shouldShowAttachedSidebar =
+    !isDraftBrowserView && !isSubmittedApplicationsView;
+  const submittedReadyCount = visibleSubmissions.filter(
     (submission) => submission.overallDecision === "ready_for_bank_review",
   ).length;
-  const submittedReviewCount = submissions.filter(
+  const submittedReviewCount = visibleSubmissions.filter(
     (submission) => submission.kycStatus === "review",
   ).length;
 
@@ -3081,58 +3151,67 @@ function App({ forceStandaloneShell = false } = {}) {
           </p>
         </div>
 
-        {submissionListState === "loading" ? (
+        {submissionListState === "loading" && !visibleSubmissions.length ? (
           <div className="draft-browser-empty">
             <p>Loading submitted applications...</p>
           </div>
+        ) : visibleSubmissions.length ? (
+          <>
+            {submissionListState === "error" ? (
+              <div className="draft-browser-empty">
+                <p>
+                  Showing the currently submitted application while the full
+                  submissions list is temporarily unavailable.
+                </p>
+              </div>
+            ) : null}
+            <div className="submitted-browser-grid">
+              {visibleSubmissions.map((submission) => (
+                <article
+                  key={submission.submissionId}
+                  className="submitted-application-card"
+                >
+                  <div className="submitted-application-header">
+                    <div>
+                      <p className="section-eyebrow">{submission.submissionId}</p>
+                      <h3>{submission.entityLabel}</h3>
+                    </div>
+                    <p className="submitted-application-timestamp">
+                      Submitted {formatTimestamp(submission.submittedAt)}
+                    </p>
+                  </div>
+
+                  <div className="submitted-application-metrics">
+                    <div className="submitted-application-metric">
+                      <span>KYC status</span>
+                      <strong>{formatDecision(submission.kycStatus)}</strong>
+                    </div>
+                    <div className="submitted-application-metric">
+                      <span>Overall decision</span>
+                      <strong>{formatDecision(submission.overallDecision)}</strong>
+                    </div>
+                  </div>
+                  <p className="submitted-application-copy">
+                    {submission.kycSummary}
+                  </p>
+                  <p className="submitted-application-copy subtle">
+                    {submission.recommendedAction}
+                  </p>
+
+                  <div className="draft-browser-actions">
+                    {submission.retrievalUrl ? (
+                      <a className="secondary-button draft-action-button" href={submission.retrievalUrl}>
+                        Open application
+                      </a>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
         ) : submissionListState === "error" ? (
           <div className="draft-browser-empty">
             <p>Submitted applications are temporarily unavailable right now.</p>
-          </div>
-        ) : submissions.length ? (
-          <div className="submitted-browser-grid">
-            {submissions.map((submission) => (
-              <article
-                key={submission.submissionId}
-                className="submitted-application-card"
-              >
-                <div className="submitted-application-header">
-                  <div>
-                    <p className="section-eyebrow">{submission.submissionId}</p>
-                    <h3>{submission.entityLabel}</h3>
-                  </div>
-                  <p className="submitted-application-timestamp">
-                    Submitted {formatTimestamp(submission.submittedAt)}
-                  </p>
-                </div>
-
-                <div className="submitted-application-metrics">
-                  <div className="submitted-application-metric">
-                    <span>KYC status</span>
-                    <strong>{formatDecision(submission.kycStatus)}</strong>
-                  </div>
-                  <div className="submitted-application-metric">
-                    <span>Overall decision</span>
-                    <strong>{formatDecision(submission.overallDecision)}</strong>
-                  </div>
-                </div>
-
-                <p className="submitted-application-copy">
-                  {submission.kycSummary}
-                </p>
-                <p className="submitted-application-copy subtle">
-                  {submission.recommendedAction}
-                </p>
-
-                <div className="draft-browser-actions">
-                  {submission.retrievalUrl ? (
-                    <a className="secondary-button draft-action-button" href={submission.retrievalUrl}>
-                      Open application
-                    </a>
-                  ) : null}
-                </div>
-              </article>
-            ))}
           </div>
         ) : (
           <div className="draft-browser-empty">
@@ -3246,7 +3325,7 @@ function App({ forceStandaloneShell = false } = {}) {
       <>
         <div className="summary-card">
           <p className="section-eyebrow">Submitted queue</p>
-          <h3>{submissions.length} applications</h3>
+          <h3>{visibleSubmissions.length} applications</h3>
           <div className="summary-rows">
             <div className="summary-row">
               <span>Ready for bank review</span>
@@ -3319,12 +3398,14 @@ function App({ forceStandaloneShell = false } = {}) {
           <h1>{heroTitle}</h1>
           <p>{heroIntro}</p>
         </div>
-        <div className="hero-meta">
-          <SummaryChip label="Completion" value={`${completionPercentage}%`} tone="accent" />
-          <SummaryChip label="Status" value={backendLabel} />
-          <SummaryChip label="Submission" value={submissionLabel} />
-          <SummaryChip label="Last sync" value={lastSyncedLabel} />
-        </div>
+        {shouldShowHeroMeta ? (
+          <div className="hero-meta">
+            <SummaryChip label="Completion" value={`${completionPercentage}%`} tone="accent" />
+            <SummaryChip label="Status" value={backendLabel} />
+            <SummaryChip label="Submission" value={submissionLabel} />
+            <SummaryChip label="Last sync" value={lastSyncedLabel} />
+          </div>
+        ) : null}
       </header>
 
       <div
@@ -3479,9 +3560,11 @@ function App({ forceStandaloneShell = false } = {}) {
           )}
         </main>
 
-        <aside className="summary-panel summary-panel-light">
-          {isSubmittedApplicationsView ? renderSubmittedSidebar() : renderApplicationSidebar()}
-        </aside>
+        {shouldShowAttachedSidebar ? (
+          <aside className="summary-panel summary-panel-light">
+            {renderApplicationSidebar()}
+          </aside>
+        ) : null}
       </div>
 
       <footer className="support-footer">

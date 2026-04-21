@@ -312,7 +312,7 @@ function buildSubmissionSummary(workspace = {}, orchestrationResult = {}, submit
 function listSubmittedApplications() {
   const rows = db
     .prepare(`
-      SELECT submission_id, submission_payload, orchestration_result, submitted_at
+      SELECT submission_id, draft_id, submission_payload, orchestration_result, submitted_at
       FROM application_submissions
       ORDER BY datetime(submitted_at) DESC
     `)
@@ -320,7 +320,7 @@ function listSubmittedApplications() {
 
   return rows.map((row) =>
     buildSubmissionSummary(
-      ensureWorkspaceMetadata(JSON.parse(row.submission_payload)),
+      ensureWorkspaceMetadata(JSON.parse(row.submission_payload), row.draft_id),
       JSON.parse(row.orchestration_result),
       row.submitted_at,
       row.submission_id,
