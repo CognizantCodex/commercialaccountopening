@@ -6,6 +6,7 @@ import { CommandPalette } from '@/app/layout/CommandPalette';
 import { DecisionBrief } from '@/app/layout/DecisionBrief';
 import { DemoControlBar } from '@/app/layout/DemoControlBar';
 import { GlobalHotkeys } from '@/app/layout/GlobalHotkeys';
+import { KycFabricFooter } from '@/app/layout/KycFabricFooter';
 import { SidebarNav } from '@/app/layout/SidebarNav';
 import { TopBar } from '@/app/layout/TopBar';
 import { AnimatedPage } from '@/components/animations/AnimatedPage';
@@ -14,7 +15,7 @@ import { usePlatformStore } from '@/store';
 import { routeCatalog, routeOrder } from '@/services/selectors';
 
 function getRouteFromPath(pathname: string) {
-  const route = pathname.replace('/', '');
+  const route = pathname.split('/').filter(Boolean).at(-1) ?? 'executive';
   return routeOrder.includes(route as (typeof routeOrder)[number])
     ? (route as (typeof routeOrder)[number])
     : 'executive';
@@ -55,6 +56,9 @@ export function AppShell() {
             </AnimatePresence>
           </div>
         </main>
+        <div className="px-4 pb-6 sm:px-6 lg:px-8">
+          <KycFabricFooter />
+        </div>
       </div>
     </div>
   );

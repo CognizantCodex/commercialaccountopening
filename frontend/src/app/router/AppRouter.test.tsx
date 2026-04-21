@@ -5,10 +5,10 @@ const createBrowserRouterMock = vi.fn((routes: unknown, options: unknown) => ({
   routes,
   options,
 }));
-const routerProviderMock = vi.fn(({ router }: { router: { routes: Array<{ children?: Array<{ path?: string }> }> } }) => (
+const routerProviderMock = vi.fn(({ router }: { router: { routes: Array<{ path?: string; children?: Array<{ path?: string }> }> } }) => (
   <div>
     Router stub
-    <span data-testid="route-count">{router.routes[0]?.children?.length ?? 0}</span>
+    <span data-testid="route-count">{router.routes[2]?.children?.length ?? 0}</span>
   </div>
 ));
 
@@ -46,6 +46,10 @@ vi.mock('@/features/governance/GovernanceView', () => ({
   GovernanceView: () => <div>Governance route</div>,
 }));
 
+vi.mock('@/features/application/LegacyAccountOpeningPage', () => ({
+  LegacyAccountOpeningPage: () => <div>Legacy application route</div>,
+}));
+
 describe('AppRouter', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -59,10 +63,16 @@ describe('AppRouter', () => {
     renderWithProviders(<AppRouter />);
 
     const [routes, options] = createBrowserRouterMock.mock.calls[0] ?? [];
-    const childRoutes = routes?.[0]?.children ?? [];
+    const childRoutes = routes?.[2]?.children ?? [];
+    const indexRoute = childRoutes.find((route: { index?: boolean }) => route.index);
 
     expect(options).toMatchObject({ basename: expect.any(String) });
+    expect(routes?.[0]?.path).toBe('/');
+    expect(routes?.[1]?.path).toBe('/application');
+    expect(routes?.[2]?.path).toBe('/kyc-fabric');
     expect(childRoutes).toHaveLength(6);
+    expect(indexRoute?.index).toBe(true);
+    expect(indexRoute?.element?.props).toMatchObject({ to: '/kyc-fabric/executive', replace: true });
     expect(childRoutes.map((route: { path?: string }) => route.path ?? 'index')).toEqual([
       'index',
       'executive',

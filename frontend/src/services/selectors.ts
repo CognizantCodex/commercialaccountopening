@@ -28,31 +28,31 @@ export const routeCatalog: Record<
   executive: {
     title: 'Executive Command Center',
     eyebrow: 'Business impact',
-    path: '/executive',
+    path: '/kyc-fabric/executive',
     persona: 'Executive sponsor',
   },
   agents: {
     title: 'AI Agent Operations Center',
     eyebrow: 'Operational intelligence',
-    path: '/agents',
+    path: '/kyc-fabric/agents',
     persona: 'AI ops lead',
   },
   cases: {
     title: 'KYC Case Explorer',
     eyebrow: 'Case execution',
-    path: '/cases',
+    path: '/kyc-fabric/cases',
     persona: 'Case analyst',
   },
   monitoring: {
     title: 'Continuous KYC Monitoring Map',
     eyebrow: 'Real-time surveillance',
-    path: '/monitoring',
+    path: '/kyc-fabric/monitoring',
     persona: 'Monitoring analyst',
   },
   governance: {
     title: 'AI Governance & Explainability Console',
     eyebrow: 'Trust and auditability',
-    path: '/governance',
+    path: '/kyc-fabric/governance',
     persona: 'Governance officer',
   },
 };

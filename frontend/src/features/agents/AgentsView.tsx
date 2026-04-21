@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { buildAgentDemoState } from '@/features/agents/demo-agents';
+import { routeCatalog } from '@/services/selectors';
 import { usePlatformStore } from '@/store';
 
 function getDefaultAgentId(agentIds: Array<{ id: string; status: 'active' | 'idle' | 'exception' }>) {
@@ -82,7 +83,7 @@ export function AgentsView() {
       focusRegion(alerts[0]?.region ?? null);
     }
 
-    void navigate(`/${route}`);
+    void navigate(routeCatalog[route].path);
   };
 
   if (!selectedAgent || !selectedAgentDemo) {
@@ -271,7 +272,7 @@ export function AgentsView() {
           items={visibleActivity}
           title={`${selectedAgent.name} activity`}
           onSelect={(item) => {
-            void navigate(`/${item.routeHint}`);
+            void navigate(routeCatalog[item.routeHint].path);
           }}
         />
         <HeatmapGrid data={confidenceMatrix} />

@@ -25,9 +25,9 @@ describe('AppShell', () => {
     const user = userEvent.setup();
 
     renderWithProviders(
-      <MemoryRouter initialEntries={['/cases']}>
+      <MemoryRouter initialEntries={['/kyc-fabric/cases']}>
         <Routes>
-          <Route path="/" element={<AppShell />}>
+          <Route path="/kyc-fabric" element={<AppShell />}>
             <Route path="cases" element={<div>Case outlet</div>} />
           </Route>
         </Routes>
@@ -44,6 +44,14 @@ describe('AppShell', () => {
     );
     expect(screen.getByText('Case outlet')).toBeInTheDocument();
     expect(screen.getByText('Decision brief')).toBeInTheDocument();
+    screen
+      .getAllByRole('link', { name: /corporate account opening/i })
+      .forEach((link) => expect(link).toHaveAttribute('href', '/'));
+    expect(screen.getByText(/talk to the onboarding support team/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /onboarding@harborcommercial.com/i })).toHaveAttribute(
+      'href',
+      'mailto:onboarding@harborcommercial.com',
+    );
     expect(document.querySelector('[aria-live="polite"]')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /command palette/i }));

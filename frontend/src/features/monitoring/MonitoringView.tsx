@@ -14,6 +14,7 @@ import { LiveActivityFeed } from '@/components/charts/LiveActivityFeed';
 import { D3WorldMap } from '@/components/maps/D3WorldMap';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { routeCatalog } from '@/services/selectors';
 import { usePlatformStore } from '@/store';
 
 export function MonitoringView() {
@@ -51,7 +52,7 @@ export function MonitoringView() {
               onRegionSelect={(region) => focusRegion(region)}
               onAlertSelect={(alert) => {
                 selectCase(alert.caseId);
-                void navigate('/cases');
+                void navigate(routeCatalog.cases.path);
               }}
             />
           </div>
@@ -60,7 +61,7 @@ export function MonitoringView() {
           items={monitoringActivityFeed.length > 0 ? monitoringActivityFeed : activityFeed}
           title="Monitoring event stream"
           onSelect={(item) => {
-            void navigate(`/${item.routeHint}`);
+            void navigate(routeCatalog[item.routeHint].path);
           }}
         />
       </section>
@@ -109,7 +110,7 @@ export function MonitoringView() {
                 className="w-full rounded-[1.25rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-left transition-colors hover:bg-[var(--surface-hover)]"
                 onClick={() => {
                   selectCase(alert.caseId);
-                  void navigate('/cases');
+                  void navigate(routeCatalog.cases.path);
                 }}
               >
                 <div className="flex items-center justify-between gap-3">

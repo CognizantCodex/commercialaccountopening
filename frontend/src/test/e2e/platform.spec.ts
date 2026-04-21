@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('narrative demo links onboarding, monitoring, and governance', async ({ page }) => {
-  await page.goto('/executive');
+  await page.goto('/kyc-fabric/executive');
 
   await expect(
     page.getByRole('heading', { name: 'Executive Command Center' }),

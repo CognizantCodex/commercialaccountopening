@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useRef, useState } from "react";
 import { loadWorkspace, saveWorkspace, submitWorkspace } from "./api";
 import { defaultWorkspace } from "./defaultWorkspace";
 
@@ -11,9 +11,9 @@ const COUNT_DIGIT_LIMIT = 6;
 const OWNERSHIP_PERCENT_DECIMAL_LIMIT = 2;
 const OWNERSHIP_PERCENT_WHOLE_LIMIT = 3;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CUSTOMER_ACCOUNT_ONBOARDING_URL = "/";
 const KYC_FABRIC_URL = "/kyc-fabric/executive";
 const KYC_FABRIC_PATH_PREFIX = "/kyc-fabric";
+const KYC_FABRIC_APPLICATION_PATH = "/kyc-fabric/application";
 
 function formatRouteLabel(segment = "") {
   return segment
@@ -33,6 +33,13 @@ function getKycFabricContext(pathname = "/") {
     isKycFabricExperience,
     routeLabel: routeSegment ? formatRouteLabel(routeSegment) : "Executive",
   };
+}
+
+function isEmbeddedApplicationRoute(pathname = "/") {
+  return (
+    pathname === KYC_FABRIC_APPLICATION_PATH ||
+    pathname.startsWith(`${KYC_FABRIC_APPLICATION_PATH}/`)
+  );
 }
 
 function createOwner(id = `owner-${Date.now()}`) {
@@ -256,6 +263,10 @@ function mergeWorkspace(candidate = {}) {
       candidate.productOptions?.length
         ? candidate.productOptions
         : defaultWorkspace.productOptions,
+    titleOptions:
+      candidate.titleOptions?.length
+        ? candidate.titleOptions
+        : defaultWorkspace.titleOptions,
     documentOptions:
       candidate.documentOptions?.length
         ? candidate.documentOptions
@@ -921,6 +932,8 @@ function SelectField({
   error = "",
   placeholder,
 }) {
+  const resolvedPlaceholder = placeholder ?? `Select ${label.toLowerCase()}`;
+
   return (
     <label className={`field${error ? " has-error" : ""}`}>
       <span>
@@ -934,7 +947,9 @@ function SelectField({
         required={required}
         aria-invalid={Boolean(error)}
       >
-        {placeholder ? <option value="">{placeholder}</option> : null}
+        <option value="" disabled={required}>
+          {resolvedPlaceholder}
+        </option>
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -974,6 +989,74 @@ function TextAreaField({
   );
 }
 
+function DateField({
+  label,
+  value,
+  onChange,
+  required = false,
+  onBlur,
+  error = "",
+}) {
+  const inputRef = useRef(null);
+  const inputId = useId();
+
+  function openDatePicker() {
+    const input = inputRef.current;
+
+    if (!input) {
+      return;
+    }
+
+    input.focus();
+
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    }
+  }
+
+  return (
+    <label className={`field${error ? " has-error" : ""}`}>
+      <span>
+        {label}
+        {required ? <small aria-hidden="true">*</small> : null}
+      </span>
+      <div className="date-field-control">
+        <input
+          ref={inputRef}
+          id={inputId}
+          type="date"
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          required={required}
+          aria-invalid={Boolean(error)}
+        />
+        <button
+          type="button"
+          className="date-picker-button"
+          onClick={openDatePicker}
+          aria-label={`Open calendar for ${label}`}
+          aria-controls={inputId}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="date-picker-icon"
+            focusable="false"
+          >
+            <path
+              d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm12 8H5v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8ZM6 6a1 1 0 0 0-1 1v1h14V7a1 1 0 0 0-1-1H6Zm2 6h2v2H8v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z"
+              fill="currentColor"
+            />
+          </svg>
+          <span className="sr-only">Open calendar</span>
+        </button>
+      </div>
+      {error ? <small className="field-error-copy">{error}</small> : null}
+    </label>
+  );
+}
+
 function OptionCard({ title, detail, checked, onChange }) {
   return (
     <label className={`option-card${checked ? " checked" : ""}`}>
@@ -990,6 +1073,7 @@ function OptionCard({ title, detail, checked, onChange }) {
 function OwnerCard({
   owner,
   index,
+  titleOptions,
   onFieldChange,
   onToggleSigner,
   onRemove,
@@ -1023,12 +1107,13 @@ function OwnerCard({
           autoComplete="name"
           required
         />
-        <TextField
+        <SelectField
           label="Title"
           value={owner.title}
           onChange={(event) => onFieldChange("title", event.target.value)}
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.title`)}
           error={getFieldError(`${ownerFieldPrefix}.title`)}
+          options={titleOptions}
           required
         />
         <TextField
@@ -1083,9 +1168,15 @@ function OwnerCard({
 }
 
 function App() {
-  const kycFabricContext = getKycFabricContext(
-    typeof window === "undefined" ? "/" : window.location.pathname,
-  );
+  const currentPathname =
+    typeof window === "undefined" ? "/" : window.location.pathname;
+  const embeddedApplicationRoute = isEmbeddedApplicationRoute(currentPathname);
+  const kycFabricContext = embeddedApplicationRoute
+    ? { isKycFabricExperience: false, routeLabel: "Application" }
+    : getKycFabricContext(currentPathname);
+  const customerAccountOpeningUrl = currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
+    ? KYC_FABRIC_APPLICATION_PATH
+    : "/";
   const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
   const [connectionState, setConnectionState] = useState("loading");
@@ -1103,31 +1194,30 @@ function App() {
     let ignore = false;
 
     async function bootstrapWorkspace() {
+      setWorkspace({
+        ...mergeWorkspace(defaultWorkspace),
+        activeStep: defaultWorkspace.activeStep,
+      });
+
       try {
-        const remoteWorkspace = await loadWorkspace();
+        await loadWorkspace();
         if (ignore) {
           return;
         }
 
-        setWorkspace({
-          ...mergeWorkspace(remoteWorkspace),
-          activeStep: defaultWorkspace.activeStep,
-        });
         setConnectionState("connected");
-        setStatusMessage("Secure draft loaded from the application workspace.");
+        setStatusMessage(
+          "Secure application workspace connected. Start with a fresh onboarding form.",
+        );
         setHasBootstrapped(true);
       } catch {
         if (ignore) {
           return;
         }
 
-        setWorkspace({
-          ...mergeWorkspace(defaultWorkspace),
-          activeStep: defaultWorkspace.activeStep,
-        });
         setConnectionState("fallback");
         setStatusMessage(
-          "The form is using local draft data until the application workspace is reachable.",
+          "The form is starting fresh while the application workspace is unreachable.",
         );
         setHasBootstrapped(true);
       }
@@ -1895,9 +1985,8 @@ function App() {
               maxLength={10}
               required
             />
-            <TextField
+            <DateField
               label="Date of incorporation"
-              type="date"
               value={workspace.companyInfo.incorporationDate}
               onChange={(event) =>
                 updateSection("companyInfo", "incorporationDate", event.target.value)
@@ -2020,7 +2109,7 @@ function App() {
               autoComplete="name"
               required
             />
-            <TextField
+            <SelectField
               label="Title"
               value={workspace.primaryContact.title}
               onChange={(event) =>
@@ -2028,6 +2117,7 @@ function App() {
               }
               onBlur={() => handleFieldBlur("primaryContact.title")}
               error={getFieldError("primaryContact.title")}
+              options={workspace.titleOptions}
               required
             />
             <TextField
@@ -2432,6 +2522,7 @@ function App() {
                 key={owner.id}
                 owner={owner}
                 index={index}
+                titleOptions={workspace.titleOptions}
                 canRemove={workspace.beneficialOwners.length > 1}
                 onFieldChange={(field, value) => updateOwner(owner.id, field, value)}
                 onFieldBlur={handleFieldBlur}
@@ -2607,7 +2698,7 @@ function App() {
               <nav className="workspace-switcher" aria-label="Workspace navigation">
                 <a
                   className={`workspace-link${!kycFabricContext.isKycFabricExperience ? " active" : ""}`}
-                  href={CUSTOMER_ACCOUNT_ONBOARDING_URL}
+                  href={customerAccountOpeningUrl}
                 >
                   <span className="workspace-link-label">Customer Account Onboarding</span>
                 </a>

@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
 export default defineConfig({
-  base: '/kyc-fabric/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -12,7 +12,10 @@ export default defineConfig({
     },
   },
   server: {
-    port: 4173,
+    port: 5173,
+    fs: {
+      allow: ['..'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8080',

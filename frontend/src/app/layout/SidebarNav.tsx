@@ -1,4 +1,4 @@
-import { Bot, Compass, Globe2, ShieldCheck, Waypoints } from 'lucide-react';
+import { ArrowLeft, Bot, Compass, Globe2, ShieldCheck, Waypoints } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { routeCatalog, routeOrder } from '@/services/selectors';
@@ -10,6 +10,8 @@ const routeIcons = {
   monitoring: Globe2,
   governance: ShieldCheck,
 };
+
+const accountOpeningPath = '/';
 
 export function SidebarNav({ compact = false }: { compact?: boolean }) {
   return (
@@ -66,6 +68,31 @@ export function SidebarNav({ compact = false }: { compact?: boolean }) {
             </NavLink>
           );
         })}
+        <NavLink
+          to={accountOpeningPath}
+          className={cn(
+            'cognizant-nav-link group rounded-[1.5rem] border px-4 py-4 transition-all duration-200 hover:-translate-y-0.5',
+            compact
+              ? 'border-[var(--border)] bg-[var(--surface-muted)]'
+              : 'border-[var(--border)] bg-[var(--surface-muted)] hover:bg-[var(--surface-hover)]',
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <span className="cognizant-nav-icon rounded-xl p-2 text-[var(--accent)]">
+              <ArrowLeft className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[var(--foreground)]">
+                Corporate Account Opening Application
+              </div>
+              {!compact && (
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  Return to the intake form workspace
+                </p>
+              )}
+            </div>
+          </div>
+        </NavLink>
       </nav>
       {!compact && (
         <div className="mt-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">

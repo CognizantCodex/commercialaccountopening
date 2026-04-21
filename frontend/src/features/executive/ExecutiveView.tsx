@@ -6,6 +6,7 @@ import { DualAxisTrendChart } from '@/components/charts/DualAxisTrendChart';
 import { D3WorldMap } from '@/components/maps/D3WorldMap';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { routeCatalog } from '@/services/selectors';
 import { usePlatformStore } from '@/store';
 
 export function ExecutiveView() {
@@ -27,7 +28,7 @@ export function ExecutiveView() {
               if (!metric.route) {
                 return;
               }
-              void navigate(`/${metric.route}`);
+              void navigate(routeCatalog[metric.route].path);
             }}
           />
         ))}
@@ -52,7 +53,7 @@ export function ExecutiveView() {
             mode="performance"
             onRegionSelect={(region) => {
               focusRegion(region);
-              void navigate('/monitoring');
+              void navigate(routeCatalog.monitoring.path);
             }}
           />
         </Card>

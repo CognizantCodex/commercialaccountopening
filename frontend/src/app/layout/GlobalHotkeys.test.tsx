@@ -27,7 +27,7 @@ describe('GlobalHotkeys', () => {
 
   it('opens the palette, navigates routes, and dispatches playback hotkeys', async () => {
     renderWithProviders(
-      <MemoryRouter initialEntries={['/executive']}>
+      <MemoryRouter initialEntries={['/kyc-fabric/executive']}>
         <GlobalHotkeys />
         <LocationProbe />
       </MemoryRouter>,
@@ -41,7 +41,7 @@ describe('GlobalHotkeys', () => {
     fireEvent.keyDown(window, { key: '2' });
 
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent('/agents');
+      expect(screen.getByTestId('location')).toHaveTextContent('/kyc-fabric/agents');
     });
 
     expect(usePlatformStore.getState().setCommandPaletteOpen).toHaveBeenNthCalledWith(1, true);
@@ -53,7 +53,7 @@ describe('GlobalHotkeys', () => {
 
   it('ignores route shortcuts while the user is typing into an input', () => {
     renderWithProviders(
-      <MemoryRouter initialEntries={['/executive']}>
+      <MemoryRouter initialEntries={['/kyc-fabric/executive']}>
         <input aria-label="typing target" />
         <GlobalHotkeys />
         <LocationProbe />
@@ -62,6 +62,6 @@ describe('GlobalHotkeys', () => {
 
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'typing target' }), { key: '3' });
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/executive');
+    expect(screen.getByTestId('location')).toHaveTextContent('/kyc-fabric/executive');
   });
 });

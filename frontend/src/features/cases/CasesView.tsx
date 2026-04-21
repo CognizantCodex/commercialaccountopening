@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CheckKycPanel } from '@/features/cases/CheckKycPanel';
+import { routeCatalog, getSelectedCase, getCaseTimeline } from '@/services/selectors';
 import { usePlatformStore } from '@/store';
-import { getSelectedCase, getCaseTimeline } from '@/services/selectors';
 
 const statusFilters = ['all', 'in-flight', 'exception', 'resolved', 'monitored'] as const;
 
@@ -238,7 +238,7 @@ export function CasesView() {
 
                     void runCaseWorkflowAction('open-governance', selectedCase.id)
                       .then(() => {
-                        void navigate('/governance');
+                        void navigate(routeCatalog.governance.path);
                       })
                       .catch(() => undefined);
                   }}

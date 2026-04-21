@@ -32,6 +32,11 @@ const GovernanceView = lazy(() =>
     default: module.GovernanceView,
   })),
 );
+const LegacyAccountOpeningPage = lazy(() =>
+  import('@/features/application/LegacyAccountOpeningPage').then((module) => ({
+    default: module.LegacyAccountOpeningPage,
+  })),
+);
 
 function RouteFallback() {
   return (
@@ -46,9 +51,21 @@ function RouteFallback() {
 const router = createBrowserRouter([
   {
     path: '/',
+    element: (
+      <Suspense fallback={<RouteFallback />}>
+        <LegacyAccountOpeningPage />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/application',
+    element: <Navigate to="/" replace />,
+  },
+  {
+    path: '/kyc-fabric',
     element: <AppShell />,
     children: [
-      { index: true, element: <Navigate to="/executive" replace /> },
+      { index: true, element: <Navigate to="/kyc-fabric/executive" replace /> },
       {
         path: 'executive',
         element: (
