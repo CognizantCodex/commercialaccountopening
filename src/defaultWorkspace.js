@@ -1,5 +1,5 @@
 export const defaultWorkspace = {
-  brandName: "Harbor Commercial",
+  brandName: "Cognizant",
   formTitle: "Corporate Account Opening Application",
   intro:
     "Complete the information below to request a corporate operating account, treasury services, and digital banking access for your business.",

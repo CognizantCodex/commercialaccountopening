@@ -383,11 +383,11 @@ function getEinError(label, value, required = false) {
     : `${label} must be 9 digits.`;
 }
 
-function getWebsiteError(label, value) {
+function getWebsiteError(label, value, required = false) {
   const normalizedValue = String(value ?? "").trim();
 
   if (!normalizedValue) {
-    return "";
+    return required ? `${label} is required.` : "";
   }
 
   return isValidWebsite(normalizedValue)
@@ -441,6 +441,7 @@ function buildValidationErrors(workspace) {
 
   const companyRequiredFields = [
     ["companyInfo.legalName", "Legal entity name", workspace.companyInfo.legalName],
+    ["companyInfo.entityType", "Entity type", workspace.companyInfo.entityType],
     [
       "companyInfo.registrationNumber",
       "Registration number",
@@ -455,6 +456,11 @@ function buildValidationErrors(workspace) {
       "companyInfo.incorporationState",
       "State of registration",
       workspace.companyInfo.incorporationState,
+    ],
+    [
+      "companyInfo.incorporationCountry",
+      "Country of registration",
+      workspace.companyInfo.incorporationCountry,
     ],
     ["companyInfo.industry", "Primary industry", workspace.companyInfo.industry],
   ];
@@ -473,15 +479,15 @@ function buildValidationErrors(workspace) {
     ],
     [
       "companyInfo.website",
-      getWebsiteError("Website", workspace.companyInfo.website),
+      getWebsiteError("Website", workspace.companyInfo.website, true),
     ],
     [
       "companyInfo.annualRevenue",
-      getCurrencyError("Annual revenue", workspace.companyInfo.annualRevenue),
+      getCurrencyError("Annual revenue", workspace.companyInfo.annualRevenue, true),
     ],
     [
       "companyInfo.employeeCount",
-      getWholeNumberError("Employee count", workspace.companyInfo.employeeCount),
+      getWholeNumberError("Employee count", workspace.companyInfo.employeeCount, true),
     ],
   ];
 
@@ -493,6 +499,7 @@ function buildValidationErrors(workspace) {
 
   const primaryContactErrors = [
     ["primaryContact.fullName", getRequiredError("Full name", workspace.primaryContact.fullName)],
+    ["primaryContact.title", getRequiredError("Title", workspace.primaryContact.title)],
     [
       "primaryContact.email",
       getEmailError("Primary contact email", workspace.primaryContact.email, true),
@@ -517,6 +524,7 @@ function buildValidationErrors(workspace) {
     ["addresses.registeredLine1", getRequiredError("Registered address line 1", workspace.addresses.registeredLine1)],
     ["addresses.city", getRequiredError("Registered city", workspace.addresses.city)],
     ["addresses.state", getRequiredError("Registered state", workspace.addresses.state)],
+    ["addresses.country", getRequiredError("Registered country", workspace.addresses.country)],
     [
       "addresses.postalCode",
       getPostalCodeError("Registered ZIP code", workspace.addresses.postalCode, true),
@@ -550,6 +558,10 @@ function buildValidationErrors(workspace) {
           workspace.addresses.operatingPostalCode,
           true,
         ),
+      ],
+      [
+        "addresses.operatingCountry",
+        getRequiredError("Operating country", workspace.addresses.operatingCountry),
       ],
     ];
 
@@ -597,6 +609,7 @@ function buildValidationErrors(workspace) {
       getWholeNumberError(
         "Number of online banking users",
         workspace.bankingProfile.onlineBankingUsers,
+        true,
       ),
     ],
   ];
@@ -626,8 +639,14 @@ function buildValidationErrors(workspace) {
           true,
         ),
       ],
-      [`${ownerPrefix}.email`, getEmailError(`${ownerLabel} email`, owner.email)],
-      [`${ownerPrefix}.phone`, getPhoneError(`${ownerLabel} phone`, owner.phone)],
+      [
+        `${ownerPrefix}.email`,
+        getEmailError(`${ownerLabel} email`, owner.email, true),
+      ],
+      [
+        `${ownerPrefix}.phone`,
+        getPhoneError(`${ownerLabel} phone`, owner.phone, true),
+      ],
     ];
 
     ownerErrors.forEach(([key, error]) => {
@@ -660,10 +679,12 @@ function getStepFieldKeys(stepId, workspace) {
     case "company":
       return [
         "companyInfo.legalName",
+        "companyInfo.entityType",
         "companyInfo.registrationNumber",
         "companyInfo.taxId",
         "companyInfo.incorporationDate",
         "companyInfo.incorporationState",
+        "companyInfo.incorporationCountry",
         "companyInfo.industry",
         "companyInfo.website",
         "companyInfo.annualRevenue",
@@ -672,6 +693,7 @@ function getStepFieldKeys(stepId, workspace) {
     case "contact":
       return [
         "primaryContact.fullName",
+        "primaryContact.title",
         "primaryContact.email",
         "primaryContact.phone",
         "primaryContact.extension",
@@ -679,6 +701,7 @@ function getStepFieldKeys(stepId, workspace) {
         "addresses.city",
         "addresses.state",
         "addresses.postalCode",
+        "addresses.country",
         ...(workspace.addresses.operatingSameAsRegistered
           ? []
           : [
@@ -686,6 +709,7 @@ function getStepFieldKeys(stepId, workspace) {
               "addresses.operatingCity",
               "addresses.operatingState",
               "addresses.operatingPostalCode",
+              "addresses.operatingCountry",
             ]),
       ];
     case "banking":
@@ -808,6 +832,13 @@ function ReviewCheckCard({ check }) {
             Response: <strong>{checkKyc.response ?? "Pending"}</strong>
           </p>
           {checkKyc.errorMessage ? <p>{checkKyc.errorMessage}</p> : null}
+          {checkKyc.missingFields?.length ? (
+            <div className="review-check-flags">
+              {checkKyc.missingFields.map((field) => (
+                <p key={field}>Missing field: {field}</p>
+              ))}
+            </div>
+          ) : null}
           {shouldShowCheckKycMessage(checkKyc) ? <p>{checkKyc.message}</p> : null}
         </div>
       ) : null}
@@ -1000,6 +1031,7 @@ function OwnerCard({
           onBlur={() => onFieldBlur(`${ownerFieldPrefix}.email`)}
           error={getFieldError(`${ownerFieldPrefix}.email`)}
           autoComplete="email"
+          required
         />
         <TextField
           label="Phone"
@@ -1012,6 +1044,7 @@ function OwnerCard({
           inputMode="numeric"
           maxLength={PHONE_DIGIT_LIMIT}
           autoComplete="tel"
+          required
         />
       </div>
 
@@ -1050,7 +1083,10 @@ function App() {
           return;
         }
 
-        setWorkspace(mergeWorkspace(remoteWorkspace));
+        setWorkspace({
+          ...mergeWorkspace(remoteWorkspace),
+          activeStep: defaultWorkspace.activeStep,
+        });
         setConnectionState("connected");
         setStatusMessage("Secure draft loaded from the application workspace.");
         setHasBootstrapped(true);
@@ -1059,7 +1095,10 @@ function App() {
           return;
         }
 
-        setWorkspace(mergeWorkspace(defaultWorkspace));
+        setWorkspace({
+          ...mergeWorkspace(defaultWorkspace),
+          activeStep: defaultWorkspace.activeStep,
+        });
         setConnectionState("fallback");
         setStatusMessage(
           "The form is using local draft data until the application workspace is reachable.",
@@ -1078,6 +1117,7 @@ function App() {
   const currentStep =
     workspace.steps.find((step) => step.id === workspace.activeStep) ??
     workspace.steps[0];
+  const isReadOnly = workspace.submission.status === "submitted";
   const currentStepIndex = workspace.steps.findIndex(
     (step) => step.id === workspace.activeStep,
   );
@@ -1141,6 +1181,7 @@ function App() {
     company: {
       complete: [
         isCompletedField("companyInfo.legalName", workspace.companyInfo.legalName),
+        isCompletedField("companyInfo.entityType", workspace.companyInfo.entityType),
         isCompletedField(
           "companyInfo.registrationNumber",
           workspace.companyInfo.registrationNumber,
@@ -1154,21 +1195,60 @@ function App() {
           "companyInfo.incorporationState",
           workspace.companyInfo.incorporationState,
         ),
+        isCompletedField(
+          "companyInfo.incorporationCountry",
+          workspace.companyInfo.incorporationCountry,
+        ),
         isCompletedField("companyInfo.industry", workspace.companyInfo.industry),
+        isCompletedField("companyInfo.website", workspace.companyInfo.website),
+        isCompletedField(
+          "companyInfo.annualRevenue",
+          workspace.companyInfo.annualRevenue,
+        ),
+        isCompletedField(
+          "companyInfo.employeeCount",
+          workspace.companyInfo.employeeCount,
+        ),
       ].filter(Boolean).length,
-      total: 6,
+      total: 11,
     },
     contact: {
       complete: [
         isCompletedField("primaryContact.fullName", workspace.primaryContact.fullName),
+        isCompletedField("primaryContact.title", workspace.primaryContact.title),
         isCompletedField("primaryContact.email", workspace.primaryContact.email),
         isCompletedField("primaryContact.phone", workspace.primaryContact.phone),
         isCompletedField("addresses.registeredLine1", workspace.addresses.registeredLine1),
         isCompletedField("addresses.city", workspace.addresses.city),
         isCompletedField("addresses.state", workspace.addresses.state),
         isCompletedField("addresses.postalCode", workspace.addresses.postalCode),
+        isCompletedField("addresses.country", workspace.addresses.country),
+        ...(workspace.addresses.operatingSameAsRegistered
+          ? []
+          : [
+              isCompletedField(
+                "addresses.operatingLine1",
+                workspace.addresses.operatingLine1,
+              ),
+              isCompletedField(
+                "addresses.operatingCity",
+                workspace.addresses.operatingCity,
+              ),
+              isCompletedField(
+                "addresses.operatingState",
+                workspace.addresses.operatingState,
+              ),
+              isCompletedField(
+                "addresses.operatingPostalCode",
+                workspace.addresses.operatingPostalCode,
+              ),
+              isCompletedField(
+                "addresses.operatingCountry",
+                workspace.addresses.operatingCountry,
+              ),
+            ]),
       ].filter(Boolean).length,
-      total: 7,
+      total: workspace.addresses.operatingSameAsRegistered ? 9 : 14,
     },
     banking: {
       complete: [
@@ -1189,8 +1269,12 @@ function App() {
           "bankingProfile.monthlyOutgoing",
           workspace.bankingProfile.monthlyOutgoing,
         ),
+        isCompletedField(
+          "bankingProfile.onlineBankingUsers",
+          workspace.bankingProfile.onlineBankingUsers,
+        ),
       ].filter(Boolean).length,
-      total: 5,
+      total: 6,
     },
     ownership: {
       complete: [
@@ -1199,9 +1283,13 @@ function App() {
             isFilled(owner.fullName) &&
             isFilled(owner.title) &&
             isFilled(owner.ownershipPercentage) &&
+            isFilled(owner.email) &&
+            isFilled(owner.phone) &&
             !validationErrors[`beneficialOwners.${owner.id}.fullName`] &&
             !validationErrors[`beneficialOwners.${owner.id}.title`] &&
-            !validationErrors[`beneficialOwners.${owner.id}.ownershipPercentage`],
+            !validationErrors[`beneficialOwners.${owner.id}.ownershipPercentage`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.email`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.phone`],
         ),
         workspace.beneficialOwners.some((owner) => owner.isAuthorizedSigner),
       ].filter(Boolean).length,
@@ -1239,8 +1327,26 @@ function App() {
   if (validationErrors["companyInfo.taxId"]) {
     missingItems.push("Provide the federal tax ID / EIN.");
   }
+  if (validationErrors["companyInfo.entityType"]) {
+    missingItems.push("Select the legal entity type.");
+  }
   if (validationErrors["companyInfo.incorporationState"]) {
     missingItems.push("Select the state of registration.");
+  }
+  if (validationErrors["companyInfo.incorporationCountry"]) {
+    missingItems.push("Select the country of registration.");
+  }
+  if (validationErrors["companyInfo.website"]) {
+    missingItems.push(validationErrors["companyInfo.website"]);
+  }
+  if (validationErrors["companyInfo.annualRevenue"]) {
+    missingItems.push(validationErrors["companyInfo.annualRevenue"]);
+  }
+  if (validationErrors["companyInfo.employeeCount"]) {
+    missingItems.push(validationErrors["companyInfo.employeeCount"]);
+  }
+  if (validationErrors["primaryContact.title"]) {
+    missingItems.push("Provide the primary contact title.");
   }
   if (validationErrors["primaryContact.email"]) {
     missingItems.push(validationErrors["primaryContact.email"]);
@@ -1254,11 +1360,20 @@ function App() {
   if (validationErrors["addresses.postalCode"]) {
     missingItems.push(validationErrors["addresses.postalCode"]);
   }
+  if (validationErrors["addresses.country"]) {
+    missingItems.push("Select the registered country.");
+  }
+  if (validationErrors["addresses.operatingCountry"]) {
+    missingItems.push("Select the operating country.");
+  }
   if (validationErrors["bankingProfile.accountPurpose"]) {
     missingItems.push("Describe the intended use of the account.");
   }
   if (validationErrors["bankingProfile.requestedProducts"]) {
     missingItems.push(validationErrors["bankingProfile.requestedProducts"]);
+  }
+  if (validationErrors["bankingProfile.onlineBankingUsers"]) {
+    missingItems.push(validationErrors["bankingProfile.onlineBankingUsers"]);
   }
   if (
     !workspace.beneficialOwners.some(
@@ -1273,6 +1388,12 @@ function App() {
   if (validationErrors["beneficialOwners.authorizedSigner"]) {
     missingItems.push(validationErrors["beneficialOwners.authorizedSigner"]);
   }
+  const ownerContractErrors = Object.entries(validationErrors)
+    .filter(([fieldKey]) =>
+      fieldKey.includes(".email") || fieldKey.includes(".phone"),
+    )
+    .map(([, message]) => message);
+  missingItems.push(...ownerContractErrors);
   if (validationErrors.documents) {
     missingItems.push(validationErrors.documents);
   }
@@ -1290,7 +1411,7 @@ function App() {
         ? "Draft mode"
         : "Connecting";
   const submissionLabel =
-    workspace.submission.status === "submitted"
+    isReadOnly
       ? formatDecision(workspace.submission.overallDecision)
       : "Draft";
   const saveLabel =
@@ -1302,8 +1423,8 @@ function App() {
   const submitLabel =
     submitState === "submitting"
       ? "Submitting application..."
-      : workspace.submission.status === "submitted"
-        ? "Re-run orchestrator"
+      : isReadOnly
+        ? "Submitted"
         : "Submit application";
 
   function markDirty() {
@@ -1401,6 +1522,10 @@ function App() {
   }
 
   function updateSection(section, field, value) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1416,6 +1541,10 @@ function App() {
   }
 
   function updateTopLevel(field, value) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1428,6 +1557,10 @@ function App() {
   }
 
   function updateOwner(ownerId, field, value) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1442,6 +1575,10 @@ function App() {
   }
 
   function removeOwner(ownerId) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1456,6 +1593,10 @@ function App() {
   }
 
   function addOwner() {
+    if (isReadOnly) {
+      return;
+    }
+
     startTransition(() => {
       setWorkspace((current) => {
         const nextWorkspace = invalidateSubmission(current);
@@ -1476,10 +1617,13 @@ function App() {
         activeStep: stepId,
       }));
     });
-    markDirty();
   }
 
   function toggleProduct(product) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1499,6 +1643,10 @@ function App() {
   }
 
   function toggleDocument(key) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1514,6 +1662,10 @@ function App() {
   }
 
   function toggleDeclaration(key) {
+    if (isReadOnly) {
+      return;
+    }
+
     setWorkspace((current) => {
       const nextWorkspace = invalidateSubmission(current);
 
@@ -1529,6 +1681,10 @@ function App() {
   }
 
   async function handleSave() {
+    if (isReadOnly) {
+      return;
+    }
+
     markFieldsTouched(currentStepFieldKeys);
 
     if (currentStepFieldKeys.some((fieldKey) => validationErrors[fieldKey])) {
@@ -1540,6 +1696,10 @@ function App() {
   }
 
   async function handleSubmitApplication() {
+    if (isReadOnly) {
+      return;
+    }
+
     markFieldsTouched(allSubmissionFieldKeys);
 
     const firstInvalidStep = workspace.steps.find((step) =>
@@ -1606,6 +1766,10 @@ function App() {
   }
 
   function handleContinue() {
+    if (isReadOnly && currentStepIndex === workspace.steps.length - 1) {
+      return;
+    }
+
     const blockingErrors = currentStepFieldKeys.filter(
       (fieldKey) => validationErrors[fieldKey],
     );
@@ -1666,6 +1830,8 @@ function App() {
               onChange={(event) =>
                 updateSection("companyInfo", "entityType", event.target.value)
               }
+              onBlur={() => handleFieldBlur("companyInfo.entityType")}
+              error={getFieldError("companyInfo.entityType")}
               options={workspace.entityTypeOptions}
               required
             />
@@ -1723,7 +1889,10 @@ function App() {
                   event.target.value,
                 )
               }
+              onBlur={() => handleFieldBlur("companyInfo.incorporationCountry")}
+              error={getFieldError("companyInfo.incorporationCountry")}
               options={workspace.countryOptions}
+              required
             />
             <SelectField
               label="Primary industry"
@@ -1746,6 +1915,7 @@ function App() {
               error={getFieldError("companyInfo.website")}
               type="url"
               autoComplete="url"
+              required
             />
             <TextField
               label="Annual revenue (USD)"
@@ -1761,6 +1931,7 @@ function App() {
               error={getFieldError("companyInfo.annualRevenue")}
               inputMode="numeric"
               maxLength={MONEY_DIGIT_LIMIT}
+              required
             />
             <TextField
               label="Employee count"
@@ -1776,6 +1947,7 @@ function App() {
               error={getFieldError("companyInfo.employeeCount")}
               inputMode="numeric"
               maxLength={COUNT_DIGIT_LIMIT}
+              required
             />
           </div>
         </section>
@@ -1816,6 +1988,9 @@ function App() {
               onChange={(event) =>
                 updateSection("primaryContact", "title", event.target.value)
               }
+              onBlur={() => handleFieldBlur("primaryContact.title")}
+              error={getFieldError("primaryContact.title")}
+              required
             />
             <TextField
               label="Email"
@@ -1936,7 +2111,10 @@ function App() {
                 onChange={(event) =>
                   updateSection("addresses", "country", event.target.value)
                 }
+                onBlur={() => handleFieldBlur("addresses.country")}
+                error={getFieldError("addresses.country")}
                 options={workspace.countryOptions}
+                required
               />
           </div>
 
@@ -2020,7 +2198,10 @@ function App() {
                 onChange={(event) =>
                   updateSection("addresses", "operatingCountry", event.target.value)
                 }
+                onBlur={() => handleFieldBlur("addresses.operatingCountry")}
+                error={getFieldError("addresses.operatingCountry")}
                 options={workspace.countryOptions}
+                required
               />
             </div>
           ) : null}
@@ -2133,6 +2314,7 @@ function App() {
               error={getFieldError("bankingProfile.onlineBankingUsers")}
               inputMode="numeric"
               maxLength={COUNT_DIGIT_LIMIT}
+              required
             />
             <TextField
               label="Foreign jurisdictions involved"
@@ -2408,13 +2590,20 @@ function App() {
               </p>
               <h2>{currentStep.title}</h2>
               <p>{currentStep.detail}</p>
+              {isReadOnly ? (
+                <p className="read-only-copy">
+                  This application has been submitted and is now read only.
+                </p>
+              ) : null}
             </div>
             <div className="banner-actions">
               <button
                 type="button"
                 className="primary-button"
                 onClick={handleSave}
-                disabled={saveState === "saving" || submitState === "submitting"}
+                disabled={
+                  isReadOnly || saveState === "saving" || submitState === "submitting"
+                }
               >
                 {saveLabel}
               </button>
@@ -2422,7 +2611,10 @@ function App() {
                 type="button"
                 className="secondary-button"
                 onClick={handleContinue}
-                disabled={submitState === "submitting"}
+                disabled={
+                  submitState === "submitting" ||
+                  (isReadOnly && currentStepIndex === workspace.steps.length - 1)
+                }
               >
                 {currentStepIndex === workspace.steps.length - 1
                   ? submitLabel
@@ -2443,7 +2635,9 @@ function App() {
             </section>
           ) : null}
 
-          <div className="section-stack">{renderActiveSection()}</div>
+          <fieldset className="section-stack section-fieldset" disabled={isReadOnly}>
+            {renderActiveSection()}
+          </fieldset>
 
           <section className="navigation-bar">
             <button
@@ -2458,7 +2652,10 @@ function App() {
               type="button"
               className="primary-button"
               onClick={handleContinue}
-              disabled={submitState === "submitting"}
+              disabled={
+                submitState === "submitting" ||
+                (isReadOnly && currentStepIndex === workspace.steps.length - 1)
+              }
             >
               {currentStepIndex === workspace.steps.length - 1
                 ? submitLabel

@@ -47,9 +47,19 @@ export async function runKycAgent(workspace) {
 
   const checkKycTransmission = await submitCheckKycApplication(workspace);
 
-  if (checkKycTransmission.response.transmissionMode === "simulated") {
+  if (checkKycTransmission.response.transmissionMode === "local") {
+    flags.push(
+      "CheckKYC is currently using the local CheckKycRequest API contract on this environment.",
+    );
+  } else if (checkKycTransmission.response.transmissionMode === "simulated") {
     flags.push(
       "CheckKYC API is running in simulated mode until an external endpoint is configured.",
+    );
+  }
+
+  if (checkKycTransmission.response.missingFields?.length) {
+    flags.push(
+      `CheckKycRequest is missing required fields: ${checkKycTransmission.response.missingFields.join(", ")}.`,
     );
   }
 
@@ -63,6 +73,7 @@ export async function runKycAgent(workspace) {
       receivedAt: checkKycTransmission.response.receivedAt,
       errorMessage: checkKycTransmission.response.errorMessage,
       message: checkKycTransmission.response.message,
+      missingFields: checkKycTransmission.response.missingFields ?? [],
     },
   };
 

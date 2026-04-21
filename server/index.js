@@ -4,7 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { submitCheckRiskApplication } from "./checkRiskApi.js";
-import { submitCheckKycApplication } from "./checkKycApi.js";
+import {
+  processCheckKycRequest,
+  submitCheckKycApplication,
+} from "./checkKycApi.js";
 import { KycFailedError } from "./agents/kycAgent.js";
 import {
   collectSubmissionIssues,
@@ -346,6 +349,15 @@ const server = createServer(async (request, response) => {
       const rawBody = await readRequestBody(request);
       const workspace = JSON.parse(rawBody);
       const result = json(await submitWorkspace(workspace));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/checkKYC") {
+      const rawBody = await readRequestBody(request);
+      const checkKycRequest = JSON.parse(rawBody);
+      const result = json(await processCheckKycRequest(checkKycRequest));
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;

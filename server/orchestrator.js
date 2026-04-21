@@ -61,6 +61,9 @@ function collectSubmissionIssues(workspace) {
   if (!hasText(workspace.companyInfo?.legalName)) {
     pushIssue("companyInfo.legalName", "Legal entity name is required.");
   }
+  if (!hasText(workspace.companyInfo?.entityType)) {
+    pushIssue("companyInfo.entityType", "Entity type is required.");
+  }
   if (!hasText(workspace.companyInfo?.registrationNumber)) {
     pushIssue("companyInfo.registrationNumber", "Registration number is required.");
   }
@@ -73,12 +76,30 @@ function collectSubmissionIssues(workspace) {
   if (!hasText(workspace.companyInfo?.incorporationState)) {
     pushIssue("companyInfo.incorporationState", "State of registration is required.");
   }
+  if (!hasText(workspace.companyInfo?.incorporationCountry)) {
+    pushIssue(
+      "companyInfo.incorporationCountry",
+      "Country of registration is required.",
+    );
+  }
   if (!hasText(workspace.companyInfo?.industry)) {
     pushIssue("companyInfo.industry", "Primary industry is required.");
+  }
+  if (!hasText(workspace.companyInfo?.website)) {
+    pushIssue("companyInfo.website", "Website is required.");
+  }
+  if (parseInteger(workspace.companyInfo?.annualRevenue) <= 0) {
+    pushIssue("companyInfo.annualRevenue", "Annual revenue must be greater than 0.");
+  }
+  if (parseInteger(workspace.companyInfo?.employeeCount) <= 0) {
+    pushIssue("companyInfo.employeeCount", "Employee count must be greater than 0.");
   }
 
   if (!hasText(workspace.primaryContact?.fullName)) {
     pushIssue("primaryContact.fullName", "Primary contact name is required.");
+  }
+  if (!hasText(workspace.primaryContact?.title)) {
+    pushIssue("primaryContact.title", "Primary contact title is required.");
   }
   if (!EMAIL_PATTERN.test(String(workspace.primaryContact?.email ?? "").trim())) {
     pushIssue("primaryContact.email", "Primary contact email must be valid.");
@@ -99,6 +120,9 @@ function collectSubmissionIssues(workspace) {
   if (!ZIP_PATTERN.test(digitsOnly(workspace.addresses?.postalCode))) {
     pushIssue("addresses.postalCode", "Registered ZIP code must be 5 digits.");
   }
+  if (!hasText(workspace.addresses?.country)) {
+    pushIssue("addresses.country", "Registered country is required.");
+  }
 
   if (!workspace.addresses?.operatingSameAsRegistered) {
     if (!hasText(workspace.addresses?.operatingLine1)) {
@@ -115,6 +139,9 @@ function collectSubmissionIssues(workspace) {
         "addresses.operatingPostalCode",
         "Operating ZIP code must be 5 digits.",
       );
+    }
+    if (!hasText(workspace.addresses?.operatingCountry)) {
+      pushIssue("addresses.operatingCountry", "Operating country is required.");
     }
   }
 
@@ -145,6 +172,12 @@ function collectSubmissionIssues(workspace) {
       "Estimated monthly outgoing volume must be greater than 0.",
     );
   }
+  if (parseInteger(workspace.bankingProfile?.onlineBankingUsers) <= 0) {
+    pushIssue(
+      "bankingProfile.onlineBankingUsers",
+      "Number of online banking users must be greater than 0.",
+    );
+  }
 
   const owners = workspace.beneficialOwners ?? [];
   if (!owners.length) {
@@ -172,12 +205,16 @@ function collectSubmissionIssues(workspace) {
     }
 
     const ownerEmail = String(owner.email ?? "").trim();
-    if (ownerEmail && !EMAIL_PATTERN.test(ownerEmail)) {
+    if (!ownerEmail) {
+      pushIssue(`${prefix}.email`, "Owner email is required.");
+    } else if (!EMAIL_PATTERN.test(ownerEmail)) {
       pushIssue(`${prefix}.email`, "Owner email must be valid.");
     }
 
     const ownerPhoneDigits = digitsOnly(owner.phone);
-    if (ownerPhoneDigits && !PHONE_PATTERN.test(ownerPhoneDigits)) {
+    if (!ownerPhoneDigits) {
+      pushIssue(`${prefix}.phone`, "Owner phone is required.");
+    } else if (!PHONE_PATTERN.test(ownerPhoneDigits)) {
       pushIssue(`${prefix}.phone`, "Owner phone must be 10 digits.");
     }
   });
