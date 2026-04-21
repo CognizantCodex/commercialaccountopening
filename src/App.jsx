@@ -892,7 +892,7 @@ function TextField({
     <label className={`field${error ? " has-error" : ""}`}>
       <span>
         {label}
-        {required ? <small>Required</small> : null}
+        {required ? <small aria-hidden="true">*</small> : null}
       </span>
       <input
         type={type}
@@ -925,7 +925,7 @@ function SelectField({
     <label className={`field${error ? " has-error" : ""}`}>
       <span>
         {label}
-        {required ? <small>Required</small> : null}
+        {required ? <small aria-hidden="true">*</small> : null}
       </span>
       <select
         value={value}
@@ -959,7 +959,7 @@ function TextAreaField({
     <label className={`field field-textarea${error ? " has-error" : ""}`}>
       <span>
         {label}
-        {required ? <small>Required</small> : null}
+        {required ? <small aria-hidden="true">*</small> : null}
       </span>
       <textarea
         value={value}
@@ -2598,9 +2598,9 @@ function App() {
                 aria-label={isMenuExpanded ? "Collapse menu" : "Expand menu"}
                 onClick={() => setIsMenuExpanded((currentValue) => !currentValue)}
               >
-                <span />
-                <span />
-                <span />
+                <span className="menu-toggle-track">
+                  <span className="menu-toggle-thumb" />
+                </span>
               </button>
             </div>
             {isMenuExpanded ? (
@@ -2610,14 +2610,12 @@ function App() {
                   href={CUSTOMER_ACCOUNT_ONBOARDING_URL}
                 >
                   <span className="workspace-link-label">Customer Account Onboarding</span>
-                  <span className="workspace-link-detail">Default workspace</span>
                 </a>
                 <a
                   className={`workspace-link${kycFabricContext.isKycFabricExperience ? " active" : ""}`}
                   href={KYC_FABRIC_URL}
                 >
                   <span className="workspace-link-label">KYC-Fabric</span>
-                  <span className="workspace-link-detail">Open KYC Fabric workspace</span>
                 </a>
               </nav>
             ) : null}

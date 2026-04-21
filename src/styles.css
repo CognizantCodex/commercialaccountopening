@@ -331,8 +331,22 @@ button {
 }
 
 .left-rail.collapsed .workspace-panel {
+  justify-items: center;
   padding-left: 14px;
   padding-right: 14px;
+  gap: 14px;
+  align-content: start;
+}
+
+.left-rail.collapsed .workspace-panel-header {
+  width: 100%;
+  justify-content: center;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.left-rail.collapsed .section-eyebrow {
+  display: none;
 }
 
 .kyc-fabric-shell .workspace-layout {
@@ -367,6 +381,11 @@ button {
 .workspace-panel,
 .summary-panel {
   padding: 22px;
+}
+
+.workspace-panel {
+  display: grid;
+  gap: 18px;
 }
 
 .kyc-fabric-shell .workspace-panel,
@@ -406,8 +425,8 @@ button {
 
 .workspace-switcher {
   display: grid;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 18px;
 }
 
 .workspace-panel-header {
@@ -415,19 +434,25 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(16, 49, 124, 0.08);
 }
 
 .menu-toggle {
-  display: inline-grid;
-  gap: 4px;
-  place-items: center;
-  width: 42px;
-  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 50px;
+  height: 50px;
   padding: 0;
   border: 1px solid rgba(16, 49, 124, 0.14);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(239, 246, 255, 0.96));
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    0 8px 20px rgba(16, 49, 124, 0.08);
   transition:
     transform 180ms ease,
     border-color 180ms ease,
@@ -439,24 +464,60 @@ button {
   transform: translateY(-1px);
   border-color: rgba(0, 198, 255, 0.28);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
-    0 10px 24px rgba(16, 49, 124, 0.08);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 14px 28px rgba(16, 49, 124, 0.12);
+}
+
+.menu-toggle:focus-visible {
+  outline: none;
+  border-color: rgba(0, 198, 255, 0.34);
+  box-shadow:
+    0 0 0 4px rgba(0, 198, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    0 14px 28px rgba(16, 49, 124, 0.12);
 }
 
 .menu-toggle span {
   display: block;
-  width: 16px;
-  height: 2px;
+}
+
+.menu-toggle-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
   border-radius: 999px;
+  background: rgba(16, 49, 124, 0.16);
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.menu-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   background: var(--navy);
+  box-shadow: 0 2px 6px rgba(16, 49, 124, 0.22);
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.menu-toggle[aria-expanded="true"] .menu-toggle-track {
+  background: rgba(0, 198, 255, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(0, 198, 255, 0.06);
+}
+
+.menu-toggle[aria-expanded="true"] .menu-toggle-thumb {
+  transform: translateX(12px);
 }
 
 .workspace-link {
   display: grid;
   gap: 4px;
-  padding: 14px 16px;
+  min-height: 0;
+  padding: 15px 16px;
   border: 1px solid rgba(16, 49, 124, 0.1);
-  border-radius: var(--radius-sm);
+  border-radius: 18px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(239, 246, 255, 0.92));
   color: inherit;
   text-decoration: none;
@@ -509,22 +570,49 @@ button {
 .kyc-fabric-shell .menu-toggle {
   border-color: rgba(157, 193, 255, 0.14);
   background: linear-gradient(180deg, rgba(10, 24, 48, 0.94), rgba(8, 19, 37, 0.94));
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 10px 24px rgba(2, 8, 20, 0.18);
 }
 
 .kyc-fabric-shell .menu-toggle:hover {
   border-color: rgba(149, 242, 227, 0.28);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 14px 30px rgba(2, 8, 20, 0.22);
+    0 16px 32px rgba(2, 8, 20, 0.24);
+}
+
+.kyc-fabric-shell .menu-toggle:focus-visible {
+  border-color: rgba(149, 242, 227, 0.32);
+  box-shadow:
+    0 0 0 4px rgba(123, 230, 212, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 16px 32px rgba(2, 8, 20, 0.24);
 }
 
 .kyc-fabric-shell .menu-toggle span {
+  background: none;
+}
+
+.kyc-fabric-shell .menu-toggle-track {
+  background: rgba(157, 193, 255, 0.18);
+}
+
+.kyc-fabric-shell .menu-toggle-thumb {
   background: var(--navy);
+  box-shadow: 0 2px 6px rgba(2, 8, 20, 0.32);
+}
+
+.kyc-fabric-shell .menu-toggle[aria-expanded="true"] .menu-toggle-track {
+  background: rgba(123, 230, 212, 0.28);
 }
 
 .kyc-fabric-shell .workspace-link-label {
   color: var(--navy);
+}
+
+.kyc-fabric-shell .workspace-panel-header {
+  border-bottom-color: rgba(157, 193, 255, 0.12);
 }
 
 .step-button {
@@ -813,10 +901,10 @@ button {
 }
 
 .field span small {
-  color: var(--warning);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  color: var(--danger);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .field.has-error span small {
