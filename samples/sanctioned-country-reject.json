@@ -1,0 +1,80 @@
+{
+  "brandName": "Harbor Commercial",
+  "formTitle": "Corporate Account Opening Application",
+  "companyInfo": {
+    "legalName": "Orion Frontier Trading LLC",
+    "tradingName": "Orion Frontier",
+    "entityType": "Corporation",
+    "registrationNumber": "IR-99001",
+    "taxId": "55-0000000",
+    "incorporationDate": "2019-01-12",
+    "incorporationState": "Tehran",
+    "incorporationCountry": "Iran",
+    "industry": "Technology services",
+    "website": "https://orionfrontier.example",
+    "annualRevenue": "7000000",
+    "employeeCount": "30"
+  },
+  "primaryContact": {
+    "fullName": "Reza Noor",
+    "title": "Finance Director",
+    "email": "reza.noor@orionfrontier.example",
+    "phone": "2125550140",
+    "extension": ""
+  },
+  "addresses": {
+    "registeredLine1": "1 Central Plaza",
+    "registeredLine2": "Floor 8",
+    "city": "Tehran",
+    "state": "Tehran",
+    "postalCode": "11369",
+    "country": "Iran",
+    "operatingSameAsRegistered": true,
+    "operatingLine1": "",
+    "operatingLine2": "",
+    "operatingCity": "",
+    "operatingState": "",
+    "operatingPostalCode": "",
+    "operatingCountry": "Iran"
+  },
+  "bankingProfile": {
+    "accountPurpose": "Operating account for software implementation fees",
+    "requestedProducts": [
+      "Operating account",
+      "ACH origination"
+    ],
+    "expectedOpeningDeposit": "80000",
+    "monthlyIncoming": "250000",
+    "monthlyOutgoing": "210000",
+    "onlineBankingUsers": "2",
+    "internationalActivity": true,
+    "jurisdictionsInScope": "Iran, United Arab Emirates",
+    "needsCommercialCards": false
+  },
+  "beneficialOwners": [
+    {
+      "id": "owner-1",
+      "fullName": "Reza Noor",
+      "title": "Finance Director",
+      "ownershipPercentage": "40",
+      "email": "reza.noor@orionfrontier.example",
+      "phone": "2125550140",
+      "isAuthorizedSigner": true
+    }
+  ],
+  "documents": {
+    "certificateOfFormation": true,
+    "taxIdLetter": true,
+    "ownershipChart": true,
+    "boardResolution": true,
+    "signerIdentification": true,
+    "addressProof": true
+  },
+  "declarations": {
+    "certifyAuthority": true,
+    "certifyBeneficialOwners": true,
+    "confirmTaxCompliance": true,
+    "confirmTerms": true
+  },
+  "additionalNotes": ""
+}

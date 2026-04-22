@@ -1,0 +1,87 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: commercialAccountOpening
+
+risk:
+  llm:
+    enabled: false
+    provider: openai-compatible
+    api-url: https://api.openai.com/v1/chat/completions
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4o-mini
+    temperature: 0.2
+  country-bands:
+    sanctioned:
+      - IRAN
+      - NORTH KOREA
+      - SYRIA
+      - CUBA
+      - RUSSIA
+    high-risk:
+      - IRAN
+      - NORTH KOREA
+      - SYRIA
+      - AFGHANISTAN
+      - MYANMAR
+  industry-bands:
+    medium-risk:
+      - TECHNOLOGY SERVICES
+      - TECH
+      - CONSULTING
+    high-risk:
+      - CRYPTO
+      - GAMBLING
+      - MSB
+  product-mapping:
+    ach-origination-products:
+      - ACH ORIGINATION
+    wire-transfer-products:
+      - WIRE TRANSFERS
+  documentation:
+    no-account-opening-documents:
+      - certificateOfFormation
+      - taxIdLetter
+      - ownershipChart
+    hold-transaction-documents:
+      - signerIdentification
+    risk-escalation-documents:
+      - addressProof
+  thresholds:
+    low-max: 30
+    medium-max: 60
+    high-max: 80
+    new-entity-months: 12
+    young-entity-months: 24
+    high-opening-deposit: 100000
+    annualized-revenue-multiplier: 1.50
+    monthly-incoming-per-employee-limit: 100000
+    pass-through-ratio-threshold: 0.90
+    beneficial-ownership-threshold: 25
+  consistency:
+    industry-purpose-keywords:
+      TECHNOLOGY SERVICES:
+        - TECHNOLOGY
+        - SOFTWARE
+        - SERVICE
+        - CLIENT
+        - SUBSCRIPTION
+        - TREASURY
+        - RECEIPTS
+        - OPERATING
+      CONSULTING:
+        - CONSULTING
+        - ADVISORY
+        - CLIENT
+        - FEES
+        - OPERATING
+      GAMBLING:
+        - GAMBLING
+        - WAGER
+        - PAYOUT
+      CRYPTO:
+        - CRYPTO
+        - DIGITAL ASSET
+        - EXCHANGE

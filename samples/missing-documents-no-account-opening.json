@@ -1,0 +1,79 @@
+{
+  "brandName": "Harbor Commercial",
+  "formTitle": "Corporate Account Opening Application",
+  "companyInfo": {
+    "legalName": "Lighthouse Growth Advisors LLC",
+    "tradingName": "Lighthouse Growth",
+    "entityType": "Corporation",
+    "registrationNumber": "C7771209",
+    "taxId": "91-0001111",
+    "incorporationDate": "2021-03-10",
+    "incorporationState": "California",
+    "incorporationCountry": "United States",
+    "industry": "Consulting",
+    "website": "https://lighthousegrowth.example",
+    "annualRevenue": "4000000",
+    "employeeCount": "18"
+  },
+  "primaryContact": {
+    "fullName": "Avery Brooks",
+    "title": "Managing Director",
+    "email": "avery.brooks@lighthousegrowth.example",
+    "phone": "3105550164",
+    "extension": ""
+  },
+  "addresses": {
+    "registeredLine1": "225 Ocean Avenue",
+    "registeredLine2": "Suite 500",
+    "city": "Santa Monica",
+    "state": "California",
+    "postalCode": "90401",
+    "country": "United States",
+    "operatingSameAsRegistered": true,
+    "operatingLine1": "",
+    "operatingLine2": "",
+    "operatingCity": "",
+    "operatingState": "",
+    "operatingPostalCode": "",
+    "operatingCountry": "United States"
+  },
+  "bankingProfile": {
+    "accountPurpose": "Operating account for advisory fees and payroll",
+    "requestedProducts": [
+      "Operating account"
+    ],
+    "expectedOpeningDeposit": "50000",
+    "monthlyIncoming": "180000",
+    "monthlyOutgoing": "140000",
+    "onlineBankingUsers": "3",
+    "internationalActivity": false,
+    "jurisdictionsInScope": "",
+    "needsCommercialCards": true
+  },
+  "beneficialOwners": [
+    {
+      "id": "owner-1",
+      "fullName": "Avery Brooks",
+      "title": "Managing Director",
+      "ownershipPercentage": "60",
+      "email": "avery.brooks@lighthousegrowth.example",
+      "phone": "3105550164",
+      "isAuthorizedSigner": true
+    }
+  ],
+  "documents": {
+    "certificateOfFormation": true,
+    "taxIdLetter": false,
+    "ownershipChart": false,
+    "boardResolution": true,
+    "signerIdentification": true,
+    "addressProof": true
+  },
+  "declarations": {
+    "certifyAuthority": true,
+    "certifyBeneficialOwners": true,
+    "confirmTaxCompliance": true,
+    "confirmTerms": true
+  },
+  "additionalNotes": ""
+}
