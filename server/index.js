@@ -16,6 +16,13 @@ import {
   listDatabaseTables,
   runDatabaseInsertAgent,
 } from "./agents/databaseInsertAgent.js";
+import {
+  createEntity,
+  deleteEntity,
+  getEntityById,
+  listEntities,
+  updateEntity,
+} from "./entityApi.js";
 import { KycFailedError } from "./agents/kycAgent.js";
 import {
   collectSubmissionIssues,
@@ -123,6 +130,18 @@ function matchesRoute(url, ...paths) {
   return paths.includes(url.pathname);
 }
 
+function matchEntityRoute(url) {
+  const match = url.pathname.match(/^\/api(?:\/v1)?\/entities(?:\/([^/]+))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    entityId: match[1] ? decodeURIComponent(match[1]) : null,
+  };
+}
+
 function getWorkspaceResource(url) {
   return String(url.searchParams.get("resource") ?? "").trim().toLowerCase();
 }
@@ -190,6 +209,28 @@ async function initializeDatabase() {
       principal_business_address TEXT NOT NULL,
       designated_agent_name TEXT NOT NULL,
       status TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS entity (
+      entity_id TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        '4' || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        lower(hex(randomblob(6)))
+      ),
+      legal_name TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      jurisdiction CHAR(2) NOT NULL,
+      registration_no TEXT,
+      tax_id TEXT,
+      lei_code TEXT,
+      incorporation_dt TEXT,
+      is_listed INTEGER NOT NULL DEFAULT 0,
+      naics_code TEXT,
+      risk_rating TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
   const workspaceDraftColumns = database
@@ -1275,7 +1316,7 @@ const server = createServer(async (request, response) => {
     if (request.method === "OPTIONS") {
       response.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
+        "Access-Control-Allow-Methods": "GET,PUT,POST,DELETE,OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       });
       response.end();
@@ -1351,6 +1392,20 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const entityRoute = matchEntityRoute(url);
+    if (request.method === "GET" && entityRoute) {
+      const responseBody = entityRoute.entityId
+        ? getEntityById(db, entityRoute.entityId)
+        : listEntities(db);
+      const result = json(
+        responseBody,
+        responseBody.error === "Entity not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (
       request.method === "GET" &&
       url.pathname === "/api/platform/snapshot"
@@ -1412,6 +1467,16 @@ const server = createServer(async (request, response) => {
       }
     }
 
+    if (request.method === "POST" && matchesRoute(url, "/api/entities", "/api/v1/entities")) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = createEntity(db, payload);
+      const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/checkKYC") {
       const rawBody = await readRequestBody(request);
       const checkKycRequest = JSON.parse(rawBody);
@@ -1428,6 +1493,32 @@ const server = createServer(async (request, response) => {
       const rawBody = await readRequestBody(request);
       const checkKybRequest = JSON.parse(rawBody);
       const result = json(await processCheckKybRequest(db, checkKybRequest));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "PUT" && entityRoute?.entityId) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = updateEntity(db, entityRoute.entityId, payload);
+      const statusCode = responseBody.error === "Entity not found."
+        ? 404
+        : responseBody.error
+          ? 400
+          : 200;
+      const result = json(responseBody, statusCode);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "DELETE" && entityRoute?.entityId) {
+      const responseBody = deleteEntity(db, entityRoute.entityId);
+      const result = json(
+        responseBody,
+        responseBody.error === "Entity not found." ? 404 : 200,
+      );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;
