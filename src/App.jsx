@@ -21,6 +21,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KYC_FABRIC_URL = "/kyc-fabric/executive";
 const KYC_FABRIC_PATH_PREFIX = "/kyc-fabric";
 const KYC_FABRIC_APPLICATION_PATH = "/kyc-fabric/application";
+const ADMIN_PATH = "/admin";
 
 function formatRouteLabel(segment = "") {
   return segment
@@ -49,6 +50,10 @@ function isEmbeddedApplicationRoute(pathname = "/") {
   );
 }
 
+function isAdminRoute(pathname = "/") {
+  return pathname === ADMIN_PATH || pathname.startsWith(`${ADMIN_PATH}/`);
+}
+
 function getRequestedDraftId() {
   if (typeof window === "undefined") {
     return "";
@@ -69,18 +74,6 @@ function getCurrentView() {
   }
 
   return "form";
-}
-
-function shouldOpenTableAgentFromUrl() {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  return (
-    params.get("assistant") === "table-agent" ||
-    params.get("view") === "table-agent"
-  );
 }
 
 function isReloadNavigation() {
@@ -130,28 +123,6 @@ function resetToDefaultUrl(pathname) {
   nextUrl.pathname = pathname;
   nextUrl.search = "";
   nextUrl.hash = "";
-  window.history.replaceState({}, "", nextUrl);
-}
-
-function syncTableAgentUrl(open) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const nextUrl = new URL(window.location.href);
-
-  if (open) {
-    nextUrl.searchParams.set("assistant", "table-agent");
-    if (nextUrl.searchParams.get("view") === "table-agent") {
-      nextUrl.searchParams.delete("view");
-    }
-  } else {
-    nextUrl.searchParams.delete("assistant");
-    if (nextUrl.searchParams.get("view") === "table-agent") {
-      nextUrl.searchParams.delete("view");
-    }
-  }
-
   window.history.replaceState({}, "", nextUrl);
 }
 
@@ -1399,14 +1370,16 @@ function OwnerCard({
 function App({ forceStandaloneShell = false } = {}) {
   const currentPathname =
     typeof window === "undefined" ? "/" : window.location.pathname;
+  const isAdminExperience = isAdminRoute(currentPathname);
   const currentView = getCurrentView();
   const shouldResetOnRefresh =
-    currentView === "form" && isReloadNavigation();
+    !isAdminExperience && currentView === "form" && isReloadNavigation();
   const embeddedApplicationRoute = isEmbeddedApplicationRoute(currentPathname);
   const kycFabricContext = embeddedApplicationRoute || forceStandaloneShell
     ? { isKycFabricExperience: false, routeLabel: "Application" }
     : getKycFabricContext(currentPathname);
-  const requestedDraftId = shouldResetOnRefresh ? "" : getRequestedDraftId();
+  const requestedDraftId =
+    shouldResetOnRefresh || isAdminExperience ? "" : getRequestedDraftId();
   const shouldLoadRequestedDraft = Boolean(requestedDraftId);
   const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
@@ -1420,17 +1393,10 @@ function App({ forceStandaloneShell = false } = {}) {
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
-  const [isTableAgentOpen, setIsTableAgentOpen] = useState(() =>
-    shouldOpenTableAgentFromUrl(),
-  );
   const [statusMessage, setStatusMessage] = useState(
     "Connecting to the secure application workspace...",
   );
   const saveVersionRef = useRef(0);
-
-  useEffect(() => {
-    setIsTableAgentOpen(shouldOpenTableAgentFromUrl());
-  }, [currentPathname, currentView]);
 
   useEffect(() => {
     let ignore = false;
@@ -1540,9 +1506,10 @@ function App({ forceStandaloneShell = false } = {}) {
   const applicationBasePath = currentPathname.startsWith(KYC_FABRIC_PATH_PREFIX)
     ? KYC_FABRIC_APPLICATION_PATH
     : "/";
-  const draftBrowserUrl = buildDraftBrowserPath(currentPathname);
-  const submittedApplicationsUrl = buildSubmittedApplicationsPath(currentPathname);
+  const draftBrowserUrl = buildDraftBrowserPath(applicationBasePath);
+  const submittedApplicationsUrl = buildSubmittedApplicationsPath(applicationBasePath);
   const customerAccountOpeningUrl = applicationBasePath;
+  const adminConsoleUrl = ADMIN_PATH;
   const latestDraft = drafts[0] ?? null;
   const fallbackSubmission =
     workspace.submission?.status === "submitted"
@@ -1558,9 +1525,8 @@ function App({ forceStandaloneShell = false } = {}) {
   const isDraftBrowserView = currentView === "drafts";
   const isSubmittedApplicationsView = currentView === "submitted";
   const shouldShowHeroMeta =
-    !isDraftBrowserView && !isSubmittedApplicationsView;
-  const shouldShowAttachedSidebar =
-    !isDraftBrowserView && !isSubmittedApplicationsView;
+    !isAdminExperience && !isDraftBrowserView && !isSubmittedApplicationsView;
+  const shouldShowAttachedSidebar = !isDraftBrowserView && !isSubmittedApplicationsView;
   const submittedReadyCount = visibleSubmissions.filter(
     (submission) => submission.overallDecision === "ready_for_bank_review",
   ).length;
@@ -1571,18 +1537,21 @@ function App({ forceStandaloneShell = false } = {}) {
   const currentStep =
     workspace.steps.find((step) => step.id === workspace.activeStep) ??
     workspace.steps[0];
-  const heroBrand = kycFabricContext.isKycFabricExperience
-    ? workspace.brandName
-    : workspace.brandName;
-  const heroTitle = kycFabricContext.isKycFabricExperience
-    ? `KYC Fabric ${kycFabricContext.routeLabel}`
-    : workspace.formTitle;
-  const heroIntro = kycFabricContext.isKycFabricExperience
-    ? "A Cognizant-aligned operating surface for intake, due diligence, and onboarding decisions across every KYC checkpoint."
-    : workspace.intro;
-  const helpCopy = kycFabricContext.isKycFabricExperience
-    ? "Contact the Cognizant onboarding team at"
-    : "Contact the onboarding team at";
+  const heroBrand = isAdminExperience
+    ? "Operations Admin"
+    : kycFabricContext.isKycFabricExperience
+      ? workspace.brandName
+      : workspace.brandName;
+  const heroTitle = isAdminExperience
+    ? "Database Control Room"
+    : kycFabricContext.isKycFabricExperience
+      ? `KYC Fabric ${kycFabricContext.routeLabel}`
+      : workspace.formTitle;
+  const heroIntro = isAdminExperience
+    ? "Inspect live SQLite tables, review operational status, and execute controlled row inserts from one focused internal workspace."
+    : kycFabricContext.isKycFabricExperience
+      ? "A Cognizant-aligned operating surface for intake, due diligence, and onboarding decisions across every KYC checkpoint."
+      : workspace.intro;
   const isReadOnly = workspace.submission.status === "submitted";
   const currentStepIndex = workspace.steps.findIndex(
     (step) => step.id === workspace.activeStep,
@@ -3419,21 +3388,98 @@ function App({ forceStandaloneShell = false } = {}) {
     );
   }
 
-  function openTableAgent() {
-    setIsTableAgentOpen(true);
-    syncTableAgentUrl(true);
+  function renderAdminWorkspace() {
+    return (
+      <section className="admin-workspace">
+        <div className="admin-workspace-header">
+          <div className="admin-kicker-row">
+            <p className="section-eyebrow">Admin tools</p>
+            <span className="admin-status-pill">{backendLabel}</span>
+          </div>
+          <h2>Database table agent</h2>
+          <p>
+            A single-purpose control surface for inspecting schema, collecting row
+            values, and writing safely into the live workspace database.
+          </p>
+        </div>
+        <div className="admin-signal-strip" aria-label="Admin workspace status">
+          <div className="admin-signal-item">
+            <span>Connection</span>
+            <strong>{backendLabel}</strong>
+          </div>
+          <div className="admin-signal-item">
+            <span>Draft records</span>
+            <strong>{drafts.length}</strong>
+          </div>
+          <div className="admin-signal-item">
+            <span>Submitted records</span>
+            <strong>{visibleSubmissions.length}</strong>
+          </div>
+          <div className="admin-signal-item">
+            <span>Last sync</span>
+            <strong>{lastSyncedLabel}</strong>
+          </div>
+        </div>
+        <TableInsertAssistant embedded />
+      </section>
+    );
   }
 
-  function closeTableAgent() {
-    setIsTableAgentOpen(false);
-    syncTableAgentUrl(false);
+  function renderAdminSidebar() {
+    return (
+      <>
+        <div className="summary-card">
+          <p className="section-eyebrow">Operating mode</p>
+          <h3>Controlled write access</h3>
+          <div className="admin-side-list">
+            <div className="admin-side-list-item">
+              <span>Assistant flow</span>
+              <strong>Step-by-step row capture</strong>
+            </div>
+            <div className="admin-side-list-item">
+              <span>Scope</span>
+              <strong>Live SQLite tables</strong>
+            </div>
+            <div className="admin-side-list-item">
+              <span>Use case</span>
+              <strong>Internal support operations</strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="summary-card">
+          <p className="section-eyebrow">Operator notes</p>
+          <h3>Before you insert</h3>
+          <div className="admin-side-list">
+            <div className="admin-side-list-item">
+              <span>1</span>
+              <strong>Pick the target table from the live list.</strong>
+            </div>
+            <div className="admin-side-list-item">
+              <span>2</span>
+              <strong>Validate each required field as the assistant prompts you.</strong>
+            </div>
+            <div className="admin-side-list-item">
+              <span>3</span>
+              <strong>Save only when the collected answers match the intended row.</strong>
+            </div>
+          </div>
+        </div>
+      </>
+    );
   }
+
+  const shellClassName = `application-shell${
+    isAdminExperience
+      ? " admin-shell"
+      : kycFabricContext.isKycFabricExperience
+        ? " kyc-fabric-shell"
+        : " customer-account-shell"
+  }`;
 
   return (
     <div
-      className={`application-shell${
-        kycFabricContext.isKycFabricExperience ? " kyc-fabric-shell" : " customer-account-shell"
-      }`}
+      className={shellClassName}
     >
       <header className="hero-panel">
         <div className="hero-copy">
@@ -3472,70 +3518,111 @@ function App({ forceStandaloneShell = false } = {}) {
             </div>
             {isMenuExpanded ? (
               <nav className="workspace-switcher" aria-label="Workspace navigation">
-                <div className={`workspace-link workspace-link-group${!kycFabricContext.isKycFabricExperience ? " active" : ""}`}>
-                  <div className="workspace-group-header">
-                    <span className="workspace-link-label">Customer Onboarding</span>
-                    <span className="workspace-link-detail">
-                      Start a new onboarding request or reopen previously saved work.
-                    </span>
+                {isAdminExperience ? (
+                  <div className="workspace-link workspace-link-group active">
+                    <div className="workspace-group-header">
+                      <span className="workspace-link-label">Admin</span>
+                      <span className="workspace-link-detail">
+                        Internal tools for database maintenance and operational support.
+                      </span>
+                    </div>
+                    <div className="workspace-submenu">
+                      <span className="workspace-submenu-label">Internal tools</span>
+                      <a
+                        className="workspace-sublink active"
+                        href={adminConsoleUrl}
+                      >
+                        <span className="workspace-sublink-kicker">Manage</span>
+                        <span className="workspace-sublink-label">Database table agent</span>
+                      </a>
+                    </div>
                   </div>
-                  <div className="workspace-submenu">
-                    <span className="workspace-submenu-label">Choose a view</span>
-                    <a
-                      className={`workspace-sublink${
-                        !kycFabricContext.isKycFabricExperience &&
-                        !isDraftBrowserView &&
-                        !isSubmittedApplicationsView
-                          ? " active"
-                          : ""
+                ) : (
+                  <>
+                    <div
+                      className={`workspace-link workspace-link-group${
+                        !kycFabricContext.isKycFabricExperience ? " active" : ""
                       }`}
-                      href={customerAccountOpeningUrl}
                     >
-                      <span className="workspace-sublink-kicker">Start</span>
-                      <span className="workspace-sublink-label">New application</span>
-                    </a>
+                      <div className="workspace-group-header">
+                        <span className="workspace-link-label">Customer Onboarding</span>
+                        <span className="workspace-link-detail">
+                          Start a new onboarding request or reopen previously saved work.
+                        </span>
+                      </div>
+                      <div className="workspace-submenu">
+                        <span className="workspace-submenu-label">Choose a view</span>
+                        <a
+                          className={`workspace-sublink${
+                            !kycFabricContext.isKycFabricExperience &&
+                            !isDraftBrowserView &&
+                            !isSubmittedApplicationsView
+                              ? " active"
+                              : ""
+                          }`}
+                          href={customerAccountOpeningUrl}
+                        >
+                          <span className="workspace-sublink-kicker">Start</span>
+                          <span className="workspace-sublink-label">New application</span>
+                        </a>
+                        <a
+                          className={`workspace-sublink${isSubmittedApplicationsView ? " active" : ""}`}
+                          href={submittedApplicationsUrl}
+                        >
+                          <span className="workspace-sublink-kicker">Review</span>
+                          <span className="workspace-sublink-label">Submitted applications</span>
+                        </a>
+                        <a
+                          className={`workspace-sublink${isDraftBrowserView ? " active" : ""}`}
+                          href={draftBrowserUrl}
+                        >
+                          <span className="workspace-sublink-kicker">Resume</span>
+                          <span className="workspace-sublink-label">Saved drafts</span>
+                        </a>
+                      </div>
+                    </div>
+                    <div className="workspace-link workspace-link-group">
+                      <div className="workspace-group-header">
+                        <span className="workspace-link-label">Admin</span>
+                        <span className="workspace-link-detail">
+                          Internal tools for database maintenance and operational support.
+                        </span>
+                      </div>
+                      <div className="workspace-submenu">
+                        <span className="workspace-submenu-label">Internal tools</span>
+                        <a
+                          className="workspace-sublink"
+                          href={adminConsoleUrl}
+                        >
+                          <span className="workspace-sublink-kicker">Manage</span>
+                          <span className="workspace-sublink-label">Database table agent</span>
+                        </a>
+                      </div>
+                    </div>
                     <a
-                      className={`workspace-sublink${isSubmittedApplicationsView ? " active" : ""}`}
-                      href={submittedApplicationsUrl}
+                      className={`workspace-link${kycFabricContext.isKycFabricExperience ? " active" : ""}`}
+                      href={KYC_FABRIC_URL}
                     >
-                      <span className="workspace-sublink-kicker">Review</span>
-                      <span className="workspace-sublink-label">Submitted applications</span>
+                      <span className="workspace-link-label">KYC-Fabric</span>
+                      <span className="workspace-link-detail">
+                        Open the operating dashboard for case, risk, and governance views.
+                      </span>
                     </a>
-                    <a
-                      className={`workspace-sublink${isDraftBrowserView ? " active" : ""}`}
-                      href={draftBrowserUrl}
-                    >
-                      <span className="workspace-sublink-kicker">Resume</span>
-                      <span className="workspace-sublink-label">Saved drafts</span>
-                    </a>
-                    <button
-                      type="button"
-                      className={`workspace-sublink workspace-sublink-button${
-                        isTableAgentOpen ? " active" : ""
-                      }`}
-                      onClick={openTableAgent}
-                    >
-                      <span className="workspace-sublink-kicker">Assist</span>
-                      <span className="workspace-sublink-label">Database table agent</span>
-                    </button>
-                  </div>
-                </div>
-                <a
-                  className={`workspace-link${kycFabricContext.isKycFabricExperience ? " active" : ""}`}
-                  href={KYC_FABRIC_URL}
-                >
-                  <span className="workspace-link-label">KYC-Fabric</span>
-                  <span className="workspace-link-detail">
-                    Open the operating dashboard for case, risk, and governance views.
-                  </span>
-                </a>
+                  </>
+                )}
               </nav>
             ) : null}
           </aside>
         </div>
 
-        <main className={`form-stage${workspace.activeStep === "company" ? " form-stage-light" : ""}`}>
-          {isDraftBrowserView ? (
+        <main
+          className={`form-stage${
+            !isAdminExperience && workspace.activeStep === "company" ? " form-stage-light" : ""
+          }`}
+        >
+          {isAdminExperience ? (
+            renderAdminWorkspace()
+          ) : isDraftBrowserView ? (
             renderDraftBrowser()
           ) : isSubmittedApplicationsView ? (
             renderSubmittedApplications()
@@ -3629,8 +3716,12 @@ function App({ forceStandaloneShell = false } = {}) {
         </main>
 
         {shouldShowAttachedSidebar ? (
-          <aside className="summary-panel summary-panel-light">
-            {renderApplicationSidebar()}
+          <aside className={`summary-panel${isAdminExperience ? "" : " summary-panel-light"}`}>
+            {isAdminExperience
+              ? renderAdminSidebar()
+              : isSubmittedApplicationsView
+                ? renderSubmittedSidebar()
+                : renderApplicationSidebar()}
           </aside>
         ) : null}
       </div>
@@ -3640,7 +3731,9 @@ function App({ forceStandaloneShell = false } = {}) {
           <p className="section-eyebrow">Need help?</p>
           <h3>Talk to the onboarding support team</h3>
           <p>
-            {kycFabricContext.isKycFabricExperience
+            {isAdminExperience
+              ? "Reach out if you need help with administrative tooling, database access, or operational controls."
+              : kycFabricContext.isKycFabricExperience
               ? "Reach out for document issues, signer guidance, or review escalations across the KYC Fabric workspace."
               : "Reach out if you need help with documentation, business details, or authorized signer requirements."}
           </p>
@@ -3650,18 +3743,6 @@ function App({ forceStandaloneShell = false } = {}) {
           <span className="support-link-detail">Email support</span>
         </a>
       </footer>
-
-      {!kycFabricContext.isKycFabricExperience ? (
-        <button
-          type="button"
-          className="table-agent-launcher"
-          onClick={openTableAgent}
-        >
-          Open DB chatbot
-        </button>
-      ) : null}
-
-      {isTableAgentOpen ? <TableInsertAssistant onClose={closeTableAgent} /> : null}
     </div>
   );
 }

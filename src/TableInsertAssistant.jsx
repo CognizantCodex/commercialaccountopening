@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useId, useState } from "react";
+import { startTransition, useEffect, useId, useRef, useState } from "react";
 import {
   describeDatabaseTable,
   insertDatabaseRow,
@@ -98,9 +98,10 @@ function getFriendlyErrorMessage(error, fallbackMessage) {
   return error?.message ?? fallbackMessage;
 }
 
-export function TableInsertAssistant({ onClose }) {
+export function TableInsertAssistant({ embedded = false, onClose }) {
   const dialogTitleId = useId();
   const dialogDescriptionId = useId();
+  const chatViewportRef = useRef(null);
   const [availableTables, setAvailableTables] = useState([]);
   const [availableTablesState, setAvailableTablesState] = useState("loading");
   const [tableNameInput, setTableNameInput] = useState("");
@@ -137,7 +138,6 @@ export function TableInsertAssistant({ onClose }) {
 
         startTransition(() => {
           setAvailableTables(nextTables);
-          setTableNameInput((currentValue) => currentValue || nextTables[0]?.name || "");
           setAvailableTablesState("loaded");
         });
       } catch (error) {
@@ -161,9 +161,13 @@ export function TableInsertAssistant({ onClose }) {
   }, []);
 
   useEffect(() => {
+    if (embedded) {
+      return undefined;
+    }
+
     function handleKeyDown(event) {
       if (event.key === "Escape") {
-        onClose();
+        onClose?.();
       }
     }
 
@@ -174,11 +178,30 @@ export function TableInsertAssistant({ onClose }) {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [onClose]);
+  }, [embedded, onClose]);
 
   useEffect(() => {
     setCurrentInputValue(fieldValues[currentColumn?.name] ?? getInitialValue(currentColumn));
   }, [currentColumn, fieldValues]);
+
+  useEffect(() => {
+    const viewport = chatViewportRef.current;
+
+    if (!viewport) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      viewport.scrollTo({
+        top: viewport.scrollHeight,
+        behavior: "smooth",
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [currentFieldIndex, errorMessage, fieldValues, saveState, schema, successMessage]);
 
   async function handleTableSubmit(event) {
     event.preventDefault();
@@ -284,47 +307,40 @@ export function TableInsertAssistant({ onClose }) {
     });
   }
 
-  return (
-    <div
-      className="table-agent-modal"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+  const assistantContent = (
+    <section
+      className={`table-agent-window${embedded ? " table-agent-window-embedded" : ""}`}
+      role={embedded ? "region" : "dialog"}
+      aria-modal={embedded ? undefined : "true"}
+      aria-labelledby={dialogTitleId}
+      aria-describedby={dialogDescriptionId}
     >
-      <section
-        className="table-agent-window"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={dialogTitleId}
-        aria-describedby={dialogDescriptionId}
-      >
-        <div className="table-agent-grid">
+      <div className="table-agent-grid">
         <div className="table-agent-panel">
           <div className="table-agent-header">
             <div className="table-agent-header-row">
               <div>
-            <p className="section-eyebrow">Table insert assistant</p>
+                <p className="section-eyebrow">Table insert assistant</p>
                 <h2 id={dialogTitleId}>Chat your way into any SQLite table</h2>
                 <p id={dialogDescriptionId}>
                   Enter a table name and the assistant will inspect its structure,
                   ask for each field one by one, and save the row when you finish.
                 </p>
               </div>
-              <button
-                type="button"
-                className="table-agent-close"
-                onClick={onClose}
-                aria-label="Close database assistant"
-              >
-                Close
-              </button>
+              {!embedded ? (
+                <button
+                  type="button"
+                  className="table-agent-close"
+                  onClick={onClose}
+                  aria-label="Close database assistant"
+                >
+                  Close
+                </button>
+              ) : null}
             </div>
           </div>
 
-          <div className="table-agent-chat" aria-live="polite">
+          <div className="table-agent-chat" aria-live="polite" ref={chatViewportRef}>
             <article className="table-agent-message assistant">
               <p className="table-agent-role">Assistant</p>
               <p>Which table would you like to add data to?</p>
@@ -382,15 +398,7 @@ export function TableInsertAssistant({ onClose }) {
                   required
                   disabled={availableTablesState === "loading" || !availableTables.length}
                 >
-                  <option value="">
-                    {availableTablesState === "loading"
-                      ? "Loading tables..."
-                      : availableTablesState === "error"
-                        ? "Unable to load tables"
-                        : availableTables.length
-                        ? "Select a table"
-                        : "No tables available"}
-                  </option>
+                  <option value="">Select a table</option>
                   {availableTables.map((table) => (
                     <option key={table.name} value={table.name}>
                       {table.label}
@@ -519,97 +527,25 @@ export function TableInsertAssistant({ onClose }) {
           ) : null}
         </div>
 
-        <aside className="summary-panel summary-panel-light table-agent-sidebar">
-          <div className="summary-card">
-            <p className="section-eyebrow">Available tables</p>
-            <h3>Database targets</h3>
-            {availableTablesState === "loading" ? (
-              <p className="progress-copy">Inspecting the database...</p>
-            ) : availableTablesState === "error" ? (
-              <p className="progress-copy">
-                Table suggestions are temporarily unavailable, but you can still
-                enter a name manually.
-              </p>
-            ) : (
-              <div className="table-agent-table-list">
-                {availableTables.map((table) => (
-                  <button
-                    key={table.name}
-                    type="button"
-                    className={`table-agent-table-chip${
-                      schema?.tableName === table.name ? " active" : ""
-                    }`}
-                    onClick={() => setTableNameInput(table.name)}
-                  >
-                    {table.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+      </div>
+    </section>
+  );
 
-          <div className="summary-card">
-            <p className="section-eyebrow">Field queue</p>
-            <h3>{schema?.label ?? "No table selected"}</h3>
-            {schema ? (
-              <div className="table-agent-field-list">
-                {insertableColumns.map((column, index) => (
-                  <div
-                    key={column.name}
-                    className={`table-agent-field-item${
-                      index < currentFieldIndex || saveState === "saved"
-                        ? " complete"
-                        : index === currentFieldIndex
-                          ? " current"
-                          : ""
-                    }`}
-                  >
-                    <div>
-                      <strong>{column.label}</strong>
-                      <span>{column.type}</span>
-                    </div>
-                    <span>
-                      {index < currentFieldIndex || saveState === "saved"
-                        ? "Collected"
-                        : index === currentFieldIndex
-                          ? "Current"
-                          : column.required
-                            ? "Required"
-                            : "Optional"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="progress-copy">
-                Once you choose a table, the assistant will map its fields here.
-              </p>
-            )}
-          </div>
+  if (embedded) {
+    return <div className="table-agent-page">{assistantContent}</div>;
+  }
 
-          <div className="summary-card">
-            <p className="section-eyebrow">Collected answers</p>
-            <h3>Ready to save</h3>
-            {Object.keys(fieldValues).length ? (
-              <div className="summary-rows">
-                {insertableColumns
-                  .filter((column) => Object.prototype.hasOwnProperty.call(fieldValues, column.name))
-                  .map((column) => (
-                    <div key={column.name} className="summary-row">
-                      <span>{column.label}</span>
-                      <strong>{formatValuePreview(column, fieldValues[column.name])}</strong>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <p className="progress-copy">
-                Answers will appear here as you move through the conversation.
-              </p>
-            )}
-          </div>
-        </aside>
-        </div>
-      </section>
+  return (
+    <div
+      className="table-agent-modal"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose?.();
+        }
+      }}
+    >
+      {assistantContent}
     </div>
   );
 }
