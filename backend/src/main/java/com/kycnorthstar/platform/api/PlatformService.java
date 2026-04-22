@@ -4,6 +4,8 @@ import com.kycnorthstar.platform.modules.activity.ActivityItemEntity;
 import com.kycnorthstar.platform.modules.activity.ActivityItemRepository;
 import com.kycnorthstar.platform.modules.agents.AgentExecutionEntity;
 import com.kycnorthstar.platform.modules.agents.AgentExecutionRepository;
+import com.kycnorthstar.platform.modules.business.BusinessInformationEntity;
+import com.kycnorthstar.platform.modules.business.BusinessInformationRepository;
 import com.kycnorthstar.platform.modules.cases.CasePriority;
 import com.kycnorthstar.platform.modules.cases.CaseStage;
 import com.kycnorthstar.platform.modules.cases.CaseStatus;
@@ -36,6 +38,7 @@ import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
@@ -57,6 +60,7 @@ public class PlatformService {
   private final AgentExecutionRepository agentRepository;
   private final ActivityItemRepository activityRepository;
   private final CustomerOrganizationRepository customerOrganizationRepository;
+  private final BusinessInformationRepository businessInformationRepository;
   private final PlatformMapper mapper;
 
   public PlatformService(
@@ -72,6 +76,7 @@ public class PlatformService {
       AgentExecutionRepository agentRepository,
       ActivityItemRepository activityRepository,
       CustomerOrganizationRepository customerOrganizationRepository,
+      BusinessInformationRepository businessInformationRepository,
       PlatformMapper mapper
   ) {
     this.caseRepository = caseRepository;
@@ -86,6 +91,7 @@ public class PlatformService {
     this.agentRepository = agentRepository;
     this.activityRepository = activityRepository;
     this.customerOrganizationRepository = customerOrganizationRepository;
+    this.businessInformationRepository = businessInformationRepository;
     this.mapper = mapper;
   }
 
@@ -139,6 +145,50 @@ public class PlatformService {
         ? "KYC screening passed for " + request.companyInfo().legalName() + "."
         : "KYC screening failed for " + request.companyInfo().legalName() + ".";
     return new PlatformModels.CheckKycResponse(status, message, OffsetDateTime.now());
+  }
+
+  @Transactional(readOnly = true)
+  public PlatformModels.CheckKybResponse checkKyb(PlatformRequests.CheckKybRequest request) {
+    OffsetDateTime checkedAt = OffsetDateTime.now();
+    Optional<BusinessInformationEntity> businessInformation = businessInformationRepository
+        .findFirstByEntityNameIgnoreCase(request.entityName().trim());
+
+    if (businessInformation.isEmpty()) {
+      return new PlatformModels.CheckKybResponse(
+          "Fail",
+          "KYB failed because no business record was found for the supplied entity name.",
+          request.entityName(),
+          false,
+          false,
+          null,
+          checkedAt
+      );
+    }
+
+    BusinessInformationEntity entity = businessInformation.get();
+    boolean addressMatched = normalizeFreeText(request.address()).equals(normalizeFreeText(entity.getAddress()));
+    boolean taxIdMatched = normalizeIdentifier(request.taxId()).equals(normalizeIdentifier(entity.getControlNumber()));
+    boolean companyActive = "active".equalsIgnoreCase(entity.getCompanyStatus());
+    boolean passed = addressMatched && taxIdMatched && companyActive;
+
+    String message;
+    if (passed) {
+      message = "KYB passed because address and tax ID matched and the company status is active.";
+    } else if (!addressMatched || !taxIdMatched) {
+      message = "KYB failed because the supplied address or tax ID did not match the business record.";
+    } else {
+      message = "KYB failed because the company status is not active.";
+    }
+
+    return new PlatformModels.CheckKybResponse(
+        passed ? "Pass" : "Fail",
+        message,
+        entity.getEntityName(),
+        addressMatched,
+        taxIdMatched,
+        entity.getCompanyStatus(),
+        checkedAt
+    );
   }
 
   @Transactional(readOnly = true)
@@ -452,5 +502,20 @@ public class PlatformService {
         severity,
         route
     ));
+  }
+
+  private String normalizeIdentifier(String value) {
+    return value == null ? "" : value.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
+  }
+
+  private String normalizeFreeText(String value) {
+    if (value == null) {
+      return "";
+    }
+    return value
+        .toLowerCase(Locale.ROOT)
+        .replaceAll("[^a-z0-9]", " ")
+        .replaceAll("\\s+", " ")
+        .trim();
   }
 }

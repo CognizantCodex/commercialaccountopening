@@ -215,4 +215,15 @@ public final class PlatformModels {
       OffsetDateTime checkedAt
   ) {
   }
+
+  public record CheckKybResponse(
+      String status,
+      String message,
+      String entityName,
+      boolean addressMatched,
+      boolean taxIdMatched,
+      String companyStatus,
+      OffsetDateTime checkedAt
+  ) {
+  }
 }

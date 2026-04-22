@@ -145,4 +145,60 @@ class PlatformControllerTest {
         .andExpect(jsonPath("$.message").exists())
         .andExpect(jsonPath("$.checkedAt").exists());
   }
+
+  @Test
+  void checkKybReturnsPassForActiveCompanyWhenAddressAndTaxIdMatch() throws Exception {
+    mockMvc.perform(post("/api/v1/checkKYB")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "entityName": "Atlas Meridian Holdings, Inc.",
+                  "address": "100 Market Street, Suite 1200, San Francisco, California 94105, United States",
+                  "taxId": "12-3456789"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("Pass"))
+        .andExpect(jsonPath("$.entityName").value("Atlas Meridian Holdings, Inc."))
+        .andExpect(jsonPath("$.addressMatched").value(true))
+        .andExpect(jsonPath("$.taxIdMatched").value(true))
+        .andExpect(jsonPath("$.companyStatus").value("Active"))
+        .andExpect(jsonPath("$.checkedAt").exists());
+  }
+
+  @Test
+  void checkKybReturnsFailForInactiveCompanyEvenWhenAddressAndTaxIdMatch() throws Exception {
+    mockMvc.perform(post("/api/v1/checkKYB")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "entityName": "Harbor Logistics LLC",
+                  "address": "500 Trade Center Drive, Newark, New Jersey 07102, United States",
+                  "taxId": "98-7654321"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("Fail"))
+        .andExpect(jsonPath("$.addressMatched").value(true))
+        .andExpect(jsonPath("$.taxIdMatched").value(true))
+        .andExpect(jsonPath("$.companyStatus").value("Inactive"));
+  }
+
+  @Test
+  void checkKybReturnsFailWhenValidationDoesNotMatchStoredBusinessRecord() throws Exception {
+    mockMvc.perform(post("/api/v1/checkKYB")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "entityName": "Atlas Meridian Holdings, Inc.",
+                  "address": "10 Wrong Street, San Francisco, California 94105, United States",
+                  "taxId": "00-0000000"
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("Fail"))
+        .andExpect(jsonPath("$.addressMatched").value(false))
+        .andExpect(jsonPath("$.taxIdMatched").value(false))
+        .andExpect(jsonPath("$.companyStatus").value("Active"));
+  }
 }

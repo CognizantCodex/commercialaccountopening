@@ -1,10 +1,12 @@
 package com.kycnorthstar.platform.api;
 
 import com.kycnorthstar.platform.api.PlatformModels.CaseRecord;
+import com.kycnorthstar.platform.api.PlatformModels.CheckKybResponse;
 import com.kycnorthstar.platform.api.PlatformModels.CheckKycResponse;
 import com.kycnorthstar.platform.api.PlatformModels.ExplainabilityResponse;
 import com.kycnorthstar.platform.api.PlatformModels.MonitoringAlert;
 import com.kycnorthstar.platform.api.PlatformModels.PlatformSnapshotResponse;
+import com.kycnorthstar.platform.api.PlatformRequests.CheckKybRequest;
 import com.kycnorthstar.platform.api.PlatformRequests.CheckKycRequest;
 import com.kycnorthstar.platform.api.PlatformRequests.CreateCaseRequest;
 import com.kycnorthstar.platform.api.PlatformRequests.CreateDocumentRequest;
@@ -49,6 +51,11 @@ public class PlatformController {
   @PostMapping("/checkKYC")
   public CheckKycResponse checkKyc(@Valid @RequestBody CheckKycRequest request) {
     return platformService.checkKyc(request);
+  }
+
+  @PostMapping("/checkKYB")
+  public CheckKybResponse checkKyb(@Valid @RequestBody CheckKybRequest request) {
+    return platformService.checkKyb(request);
   }
 
   @PostMapping("/cases")

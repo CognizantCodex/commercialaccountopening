@@ -9,6 +9,7 @@ import {
   processCheckKycRequest,
   submitCheckKycApplication,
 } from "./checkKycApi.js";
+import { processCheckKybRequest } from "./checkKybApi.js";
 import {
   describeDatabaseTable,
   DatabaseInsertAgentError,
@@ -1415,6 +1416,18 @@ const server = createServer(async (request, response) => {
       const rawBody = await readRequestBody(request);
       const checkKycRequest = JSON.parse(rawBody);
       const result = json(await processCheckKycRequest(checkKycRequest));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      matchesRoute(url, "/api/checkKYB", "/api/v1/checkKYB")
+    ) {
+      const rawBody = await readRequestBody(request);
+      const checkKybRequest = JSON.parse(rawBody);
+      const result = json(await processCheckKybRequest(db, checkKybRequest));
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;

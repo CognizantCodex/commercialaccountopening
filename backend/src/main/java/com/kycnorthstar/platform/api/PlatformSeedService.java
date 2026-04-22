@@ -5,6 +5,8 @@ import com.kycnorthstar.platform.modules.activity.ActivityItemRepository;
 import com.kycnorthstar.platform.modules.agents.AgentExecutionEntity;
 import com.kycnorthstar.platform.modules.agents.AgentExecutionRepository;
 import com.kycnorthstar.platform.modules.agents.AgentStatus;
+import com.kycnorthstar.platform.modules.business.BusinessInformationEntity;
+import com.kycnorthstar.platform.modules.business.BusinessInformationRepository;
 import com.kycnorthstar.platform.modules.cases.CasePriority;
 import com.kycnorthstar.platform.modules.cases.CaseStage;
 import com.kycnorthstar.platform.modules.cases.CaseStatus;
@@ -54,6 +56,7 @@ public class PlatformSeedService implements CommandLineRunner {
   private final DecisionEvidenceRepository decisionEvidence;
   private final AgentExecutionRepository agents;
   private final ActivityItemRepository activityItems;
+  private final BusinessInformationRepository businessInformation;
 
   public PlatformSeedService(
       CustomerOrganizationRepository customerOrganizations,
@@ -67,7 +70,8 @@ public class PlatformSeedService implements CommandLineRunner {
       DecisionReasoningStepRepository reasoningSteps,
       DecisionEvidenceRepository decisionEvidence,
       AgentExecutionRepository agents,
-      ActivityItemRepository activityItems
+      ActivityItemRepository activityItems,
+      BusinessInformationRepository businessInformation
   ) {
     this.customerOrganizations = customerOrganizations;
     this.complianceCases = complianceCases;
@@ -81,6 +85,7 @@ public class PlatformSeedService implements CommandLineRunner {
     this.decisionEvidence = decisionEvidence;
     this.agents = agents;
     this.activityItems = activityItems;
+    this.businessInformation = businessInformation;
   }
 
   @Override
@@ -93,6 +98,23 @@ public class PlatformSeedService implements CommandLineRunner {
         new CustomerOrganizationEntity("client-aurora", "Aurora Atlas Capital", "Private Bank", "London", "Europe", 51.5072, -0.1276, "Asset Management", 2_700_000_000L),
         new CustomerOrganizationEntity("client-orion", "Orion Meridian Holdings", "Corporate", "New York", "North America", 40.7128, -74.0060, "Holding Company", 5_100_000_000L),
         new CustomerOrganizationEntity("client-lattice", "Lattice Harbor Trust", "Wealth", "Geneva", "Europe", 46.2044, 6.1432, "Trust Services", 910_000_000L)
+    ));
+
+    businessInformation.saveAll(List.of(
+        new BusinessInformationEntity(
+            "biz-atlas",
+            "Atlas Meridian Holdings, Inc.",
+            "100 Market Street Suite 1200 San Francisco California 94105 United States",
+            "12-3456789",
+            "Active"
+        ),
+        new BusinessInformationEntity(
+            "biz-harbor",
+            "Harbor Logistics LLC",
+            "500 Trade Center Drive Newark New Jersey 07102 United States",
+            "98-7654321",
+            "Inactive"
+        )
     ));
 
     complianceCases.saveAll(List.of(

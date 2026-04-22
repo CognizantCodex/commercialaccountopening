@@ -69,6 +69,13 @@ public final class PlatformRequests {
   ) {
   }
 
+  public record CheckKybRequest(
+      @NotBlank String entityName,
+      @NotBlank String address,
+      @NotBlank String taxId
+  ) {
+  }
+
   public record CompanyInfo(
       @NotBlank String legalName,
       String tradingName,

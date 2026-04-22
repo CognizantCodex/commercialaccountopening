@@ -85,6 +85,33 @@ paths:
                 $ref: '#/components/schemas/CheckKycResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+  /checkKYB:
+    post:
+      tags: [Screening]
+      summary: Run the platform CheckKYB evaluation
+      operationId: checkKyb
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckKybRequest'
+            examples:
+              activeCompany:
+                summary: Active company with matching address and tax ID
+                value:
+                  entityName: Atlas Meridian Holdings, Inc.
+                  address: 100 Market Street, Suite 1200, San Francisco, California 94105, United States
+                  taxId: 12-3456789
+      responses:
+        '200':
+          description: CheckKYB result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckKybResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /cases/{caseId}:
     get:
       tags: [Cases]
@@ -452,6 +479,16 @@ components:
         additionalNotes:
           type: string
           nullable: true
+    CheckKybRequest:
+      type: object
+      required: [entityName, address, taxId]
+      properties:
+        entityName:
+          type: string
+        address:
+          type: string
+        taxId:
+          type: string
     CompanyInfo:
       type: object
       required:
@@ -668,6 +705,27 @@ components:
           type: string
         message:
           type: string
+        checkedAt:
+          type: string
+          format: date-time
+    CheckKybResponse:
+      type: object
+      required: [status, message, entityName, addressMatched, taxIdMatched, checkedAt]
+      properties:
+        status:
+          type: string
+          enum: [Pass, Fail]
+        message:
+          type: string
+        entityName:
+          type: string
+        addressMatched:
+          type: boolean
+        taxIdMatched:
+          type: boolean
+        companyStatus:
+          type: string
+          nullable: true
         checkedAt:
           type: string
           format: date-time
