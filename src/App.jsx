@@ -1526,7 +1526,8 @@ function App({ forceStandaloneShell = false } = {}) {
   const isSubmittedApplicationsView = currentView === "submitted";
   const shouldShowHeroMeta =
     !isAdminExperience && !isDraftBrowserView && !isSubmittedApplicationsView;
-  const shouldShowAttachedSidebar = !isDraftBrowserView && !isSubmittedApplicationsView;
+  const shouldShowAttachedSidebar =
+    !isAdminExperience && !isDraftBrowserView && !isSubmittedApplicationsView;
   const submittedReadyCount = visibleSubmissions.filter(
     (submission) => submission.overallDecision === "ready_for_bank_review",
   ).length;
@@ -1543,7 +1544,7 @@ function App({ forceStandaloneShell = false } = {}) {
       ? workspace.brandName
       : workspace.brandName;
   const heroTitle = isAdminExperience
-    ? "Database Control Room"
+    ? "Database admin panel"
     : kycFabricContext.isKycFabricExperience
       ? `KYC Fabric ${kycFabricContext.routeLabel}`
       : workspace.formTitle;
@@ -3391,17 +3392,6 @@ function App({ forceStandaloneShell = false } = {}) {
   function renderAdminWorkspace() {
     return (
       <section className="admin-workspace">
-        <div className="admin-workspace-header">
-          <div className="admin-kicker-row">
-            <p className="section-eyebrow">Admin tools</p>
-            <span className="admin-status-pill">{backendLabel}</span>
-          </div>
-          <h2>Database table agent</h2>
-          <p>
-            A single-purpose control surface for inspecting schema, collecting row
-            values, and writing safely into the live workspace database.
-          </p>
-        </div>
         <div className="admin-signal-strip" aria-label="Admin workspace status">
           <div className="admin-signal-item">
             <span>Connection</span>
@@ -3484,7 +3474,7 @@ function App({ forceStandaloneShell = false } = {}) {
       <header className="hero-panel">
         <div className="hero-copy">
           <p className="brand-mark">{heroBrand}</p>
-          <h1>{heroTitle}</h1>
+          {heroTitle ? <h1>{heroTitle}</h1> : null}
           <p>{heroIntro}</p>
         </div>
         {shouldShowHeroMeta ? (

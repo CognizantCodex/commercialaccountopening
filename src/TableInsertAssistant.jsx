@@ -526,7 +526,6 @@ export function TableInsertAssistant({ embedded = false, onClose }) {
             </form>
           ) : null}
         </div>
-
       </div>
     </section>
   );
