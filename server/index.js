@@ -9,6 +9,12 @@ import {
   processCheckKycRequest,
   submitCheckKycApplication,
 } from "./checkKycApi.js";
+import {
+  describeDatabaseTable,
+  DatabaseInsertAgentError,
+  listDatabaseTables,
+  runDatabaseInsertAgent,
+} from "./agents/databaseInsertAgent.js";
 import { KycFailedError } from "./agents/kycAgent.js";
 import {
   collectSubmissionIssues,
@@ -112,6 +118,14 @@ function json(value, statusCode = 200) {
   };
 }
 
+function matchesRoute(url, ...paths) {
+  return paths.includes(url.pathname);
+}
+
+function getWorkspaceResource(url) {
+  return String(url.searchParams.get("resource") ?? "").trim().toLowerCase();
+}
+
 class ValidationError extends Error {
   constructor(message, issues = []) {
     super(message);
@@ -167,6 +181,14 @@ async function initializeDatabase() {
       submission_payload TEXT NOT NULL,
       orchestration_result TEXT NOT NULL,
       submitted_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS business_information (
+      business_name TEXT NOT NULL,
+      control_number TEXT PRIMARY KEY,
+      business_type TEXT NOT NULL,
+      principal_business_address TEXT NOT NULL,
+      designated_agent_name TEXT NOT NULL,
+      status TEXT NOT NULL
     );
   `);
   const workspaceDraftColumns = database
@@ -1279,6 +1301,23 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && url.pathname === "/api/account-opening/workspace") {
+      const workspaceResource = getWorkspaceResource(url);
+
+      if (workspaceResource === "tables") {
+        const result = json({ tables: listDatabaseTables(db) });
+        response.writeHead(result.statusCode, result.headers);
+        response.end(result.body);
+        return;
+      }
+
+      if (workspaceResource === "table-schema") {
+        const tableName = url.searchParams.get("tableName") ?? "";
+        const result = json(describeDatabaseTable(db, tableName));
+        response.writeHead(result.statusCode, result.headers);
+        response.end(result.body);
+        return;
+      }
+
       const draftId = getDraftIdFromUrl(url) || PRIMARY_DRAFT_ID;
       let result;
 
@@ -1332,7 +1371,17 @@ const server = createServer(async (request, response) => {
     }
 
     if (request.method === "PUT" && url.pathname === "/api/account-opening/workspace") {
+      const workspaceResource = getWorkspaceResource(url);
       const rawBody = await readRequestBody(request);
+
+      if (workspaceResource === "table-insert") {
+        const payload = JSON.parse(rawBody);
+        const result = json(runDatabaseInsertAgent(db, payload), 201);
+        response.writeHead(result.statusCode, result.headers);
+        response.end(result.body);
+        return;
+      }
+
       const workspace = JSON.parse(rawBody);
       const result = json(saveWorkspace(workspace, getDraftIdFromUrl(url)));
       response.writeHead(result.statusCode, result.headers);
@@ -1349,10 +1398,54 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/account-opening/workspace") {
+      const workspaceResource = getWorkspaceResource(url);
+
+      if (workspaceResource === "table-insert") {
+        const rawBody = await readRequestBody(request);
+        const payload = JSON.parse(rawBody);
+        const result = json(runDatabaseInsertAgent(db, payload), 201);
+        response.writeHead(result.statusCode, result.headers);
+        response.end(result.body);
+        return;
+      }
+    }
+
     if (request.method === "POST" && url.pathname === "/api/checkKYC") {
       const rawBody = await readRequestBody(request);
       const checkKycRequest = JSON.parse(rawBody);
       const result = json(await processCheckKycRequest(checkKycRequest));
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "GET" &&
+      matchesRoute(
+        url,
+        "/api/account-opening/tables",
+        "/api/agents/database/tables",
+        "/api/account-opening/agents/database/tables",
+      )
+    ) {
+      const result = json({ tables: listDatabaseTables(db) });
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "GET" &&
+      matchesRoute(
+        url,
+        "/api/account-opening/table-schema",
+        "/api/agents/database/schema",
+        "/api/account-opening/agents/database/schema",
+      )
+    ) {
+      const tableName = url.searchParams.get("tableName") ?? "";
+      const result = json(describeDatabaseTable(db, tableName));
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;
@@ -1382,6 +1475,23 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (
+      request.method === "POST" &&
+      matchesRoute(
+        url,
+        "/api/account-opening/table-insert",
+        "/api/agents/database/insert",
+        "/api/account-opening/agents/database/insert",
+      )
+    ) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const result = json(runDatabaseInsertAgent(db, payload), 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     const result = json({ error: "Route not found." }, 404);
     response.writeHead(result.statusCode, result.headers);
     response.end(result.body);
@@ -1391,6 +1501,8 @@ const server = createServer(async (request, response) => {
         ? json({ error: "Invalid JSON payload." }, 500)
         : error instanceof ValidationError
           ? json({ error: error.message, issues: error.issues }, 400)
+          : error instanceof DatabaseInsertAgentError
+            ? json({ error: error.message, issues: error.issues }, 400)
           : error instanceof KycFailedError
             ? (() => {
                 const message = String(error.message ?? "KYC Failed.");

@@ -7,6 +7,7 @@ import {
   submitWorkspace,
 } from "./api";
 import { defaultWorkspace } from "./defaultWorkspace";
+import { TableInsertAssistant } from "./TableInsertAssistant";
 
 const PHONE_DIGIT_LIMIT = 10;
 const POSTAL_CODE_DIGIT_LIMIT = 5;
@@ -70,6 +71,18 @@ function getCurrentView() {
   return "form";
 }
 
+function shouldOpenTableAgentFromUrl() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  return (
+    params.get("assistant") === "table-agent" ||
+    params.get("view") === "table-agent"
+  );
+}
+
 function isReloadNavigation() {
   if (typeof window === "undefined") {
     return false;
@@ -117,6 +130,28 @@ function resetToDefaultUrl(pathname) {
   nextUrl.pathname = pathname;
   nextUrl.search = "";
   nextUrl.hash = "";
+  window.history.replaceState({}, "", nextUrl);
+}
+
+function syncTableAgentUrl(open) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const nextUrl = new URL(window.location.href);
+
+  if (open) {
+    nextUrl.searchParams.set("assistant", "table-agent");
+    if (nextUrl.searchParams.get("view") === "table-agent") {
+      nextUrl.searchParams.delete("view");
+    }
+  } else {
+    nextUrl.searchParams.delete("assistant");
+    if (nextUrl.searchParams.get("view") === "table-agent") {
+      nextUrl.searchParams.delete("view");
+    }
+  }
+
   window.history.replaceState({}, "", nextUrl);
 }
 
@@ -1385,10 +1420,17 @@ function App({ forceStandaloneShell = false } = {}) {
   const [hasBootstrapped, setHasBootstrapped] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [touchedFields, setTouchedFields] = useState({});
+  const [isTableAgentOpen, setIsTableAgentOpen] = useState(() =>
+    shouldOpenTableAgentFromUrl(),
+  );
   const [statusMessage, setStatusMessage] = useState(
     "Connecting to the secure application workspace...",
   );
   const saveVersionRef = useRef(0);
+
+  useEffect(() => {
+    setIsTableAgentOpen(shouldOpenTableAgentFromUrl());
+  }, [currentPathname, currentView]);
 
   useEffect(() => {
     let ignore = false;
@@ -3377,6 +3419,16 @@ function App({ forceStandaloneShell = false } = {}) {
     );
   }
 
+  function openTableAgent() {
+    setIsTableAgentOpen(true);
+    syncTableAgentUrl(true);
+  }
+
+  function closeTableAgent() {
+    setIsTableAgentOpen(false);
+    syncTableAgentUrl(false);
+  }
+
   return (
     <div
       className={`application-shell${
@@ -3430,7 +3482,13 @@ function App({ forceStandaloneShell = false } = {}) {
                   <div className="workspace-submenu">
                     <span className="workspace-submenu-label">Choose a view</span>
                     <a
-                      className={`workspace-sublink${!kycFabricContext.isKycFabricExperience && !isDraftBrowserView && !isSubmittedApplicationsView ? " active" : ""}`}
+                      className={`workspace-sublink${
+                        !kycFabricContext.isKycFabricExperience &&
+                        !isDraftBrowserView &&
+                        !isSubmittedApplicationsView
+                          ? " active"
+                          : ""
+                      }`}
                       href={customerAccountOpeningUrl}
                     >
                       <span className="workspace-sublink-kicker">Start</span>
@@ -3450,6 +3508,16 @@ function App({ forceStandaloneShell = false } = {}) {
                       <span className="workspace-sublink-kicker">Resume</span>
                       <span className="workspace-sublink-label">Saved drafts</span>
                     </a>
+                    <button
+                      type="button"
+                      className={`workspace-sublink workspace-sublink-button${
+                        isTableAgentOpen ? " active" : ""
+                      }`}
+                      onClick={openTableAgent}
+                    >
+                      <span className="workspace-sublink-kicker">Assist</span>
+                      <span className="workspace-sublink-label">Database table agent</span>
+                    </button>
                   </div>
                 </div>
                 <a
@@ -3582,6 +3650,18 @@ function App({ forceStandaloneShell = false } = {}) {
           <span className="support-link-detail">Email support</span>
         </a>
       </footer>
+
+      {!kycFabricContext.isKycFabricExperience ? (
+        <button
+          type="button"
+          className="table-agent-launcher"
+          onClick={openTableAgent}
+        >
+          Open DB chatbot
+        </button>
+      ) : null}
+
+      {isTableAgentOpen ? <TableInsertAssistant onClose={closeTableAgent} /> : null}
     </div>
   );
 }

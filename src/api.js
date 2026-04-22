@@ -1,5 +1,26 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
+const DATABASE_AGENT_PATHS = {
+  tables: [
+    `${API_BASE}/account-opening/workspace?resource=tables`,
+    `${API_BASE}/account-opening/tables`,
+    `${API_BASE}/agents/database/tables`,
+    `${API_BASE}/account-opening/agents/database/tables`,
+  ],
+  schema: [
+    `${API_BASE}/account-opening/workspace?resource=table-schema`,
+    `${API_BASE}/account-opening/table-schema`,
+    `${API_BASE}/agents/database/schema`,
+    `${API_BASE}/account-opening/agents/database/schema`,
+  ],
+  insert: [
+    `${API_BASE}/account-opening/workspace?resource=table-insert`,
+    `${API_BASE}/account-opening/table-insert`,
+    `${API_BASE}/agents/database/insert`,
+    `${API_BASE}/account-opening/agents/database/insert`,
+  ],
+};
+
 function withDraftId(path, draftId) {
   if (!draftId) {
     return `${API_BASE}${path}`;
@@ -22,6 +43,55 @@ async function readJson(response) {
   }
 
   return payload;
+}
+
+function shouldRetryOnAlternatePath(error) {
+  const message = String(error?.message ?? "").toLowerCase();
+  return error?.status === 404 || message.includes("route not found");
+}
+
+function createUnexpectedPayloadError(message, payload) {
+  const error = new Error(message);
+  error.name = "UnexpectedApiPayloadError";
+  error.payload = payload;
+  return error;
+}
+
+async function requestJsonWithFallback(paths, init, isValidPayload = () => true) {
+  let lastError = null;
+  let preferredError = null;
+
+  for (let index = 0; index < paths.length; index += 1) {
+    try {
+      const response = await fetch(paths[index], init);
+      const payload = await readJson(response);
+
+      if (!isValidPayload(payload)) {
+        throw createUnexpectedPayloadError(
+          `Unexpected payload received from ${paths[index]}.`,
+          payload,
+        );
+      }
+
+      return payload;
+    } catch (error) {
+      lastError = error;
+
+      if (error?.name === "UnexpectedApiPayloadError") {
+        preferredError = error;
+      }
+
+      if (
+        (!shouldRetryOnAlternatePath(error) &&
+          error?.name !== "UnexpectedApiPayloadError") ||
+        index === paths.length - 1
+      ) {
+        throw preferredError ?? error;
+      }
+    }
+  }
+
+  throw preferredError ?? lastError ?? new Error("Request failed.");
 }
 
 function deriveFallbackKycStatus(submittedCase = {}) {
@@ -184,4 +254,42 @@ export async function submitWorkspace(workspace, draftId = workspace?.draftId) {
   });
 
   return readJson(response);
+}
+
+export async function listDatabaseTables() {
+  return requestJsonWithFallback(
+    DATABASE_AGENT_PATHS.tables,
+    undefined,
+    (payload) => Array.isArray(payload?.tables),
+  );
+}
+
+export async function describeDatabaseTable(tableName) {
+  const params = new URLSearchParams({ tableName: String(tableName ?? "") });
+  return requestJsonWithFallback(
+    DATABASE_AGENT_PATHS.schema.map((path) =>
+      path.includes("?")
+        ? `${path}&${params.toString()}`
+        : `${path}?${params.toString()}`,
+    ),
+    undefined,
+    (payload) => Array.isArray(payload?.columns),
+  );
+}
+
+export async function insertDatabaseRow(tableName, data) {
+  return requestJsonWithFallback(
+    DATABASE_AGENT_PATHS.insert,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tableName,
+        data,
+      }),
+    },
+    (payload) => payload?.inserted === true,
+  );
 }
