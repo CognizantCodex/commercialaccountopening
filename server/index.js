@@ -1344,22 +1344,32 @@ async function serveKycFabricAsset(pathname, response) {
   try {
     const body = await readFile(assetPath);
     const extension = path.extname(assetPath).toLowerCase();
+    const responseBody = relativePath === "index.html"
+      ? body
+          .toString("utf8")
+          .replaceAll('src="/assets/', 'src="/kyc-fabric/assets/')
+          .replaceAll('href="/assets/', 'href="/kyc-fabric/assets/')
+      : body;
     response.writeHead(200, {
       "Content-Type":
         STATIC_CONTENT_TYPES[extension] ?? "application/octet-stream",
       "Cache-Control": isAssetRequest ? "public, max-age=31536000, immutable" : "no-cache",
     });
-    response.end(body);
+    response.end(responseBody);
     return true;
   } catch {
     if (!isAssetRequest) {
       try {
         const indexHtml = await readFile(path.join(kycFabricDistDir, "index.html"));
+        const responseBody = indexHtml
+          .toString("utf8")
+          .replaceAll('src="/assets/', 'src="/kyc-fabric/assets/')
+          .replaceAll('href="/assets/', 'href="/kyc-fabric/assets/');
         response.writeHead(200, {
           "Content-Type": "text/html; charset=utf-8",
           "Cache-Control": "no-cache",
         });
-        response.end(indexHtml);
+        response.end(responseBody);
         return true;
       } catch {
         const result = json(
