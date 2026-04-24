@@ -23,6 +23,13 @@ import {
   listEntities,
   updateEntity,
 } from "./entityApi.js";
+import {
+  createUbo,
+  deleteUbo,
+  getUboById,
+  listUbos,
+  updateUbo,
+} from "./uboApi.js";
 import { KycFailedError } from "./agents/kycAgent.js";
 import {
   collectSubmissionIssues,
@@ -142,6 +149,18 @@ function matchEntityRoute(url) {
   };
 }
 
+function matchUboRoute(url) {
+  const match = url.pathname.match(/^\/api(?:\/v1)?\/ubos(?:\/([^/]+))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    uboId: match[1] ? decodeURIComponent(match[1]) : null,
+  };
+}
+
 function getWorkspaceResource(url) {
   return String(url.searchParams.get("resource") ?? "").trim().toLowerCase();
 }
@@ -182,6 +201,7 @@ async function initializeDatabase() {
   const database = new DatabaseSync(databasePath);
   database.exec(`
     PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
     CREATE TABLE IF NOT EXISTS workspace_drafts (
       draft_id TEXT PRIMARY KEY,
       entity_key TEXT,
@@ -232,6 +252,60 @@ async function initializeDatabase() {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS ubos (
+      ubo_id TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        '4' || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        lower(hex(randomblob(6)))
+      ),
+      entity_id TEXT NOT NULL,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      date_of_birth TEXT NOT NULL,
+      nationality TEXT NOT NULL,
+      country_of_residence TEXT NOT NULL,
+      id_type TEXT NOT NULL,
+      id_number TEXT NOT NULL,
+      id_expiry_date TEXT,
+      id_issuing_country TEXT,
+      ownership_pct NUMERIC NOT NULL,
+      control_type TEXT,
+      is_pep INTEGER NOT NULL DEFAULT 0,
+      is_sanctioned INTEGER NOT NULL DEFAULT 0,
+      is_adverse_media INTEGER NOT NULL DEFAULT 0,
+      screening_status TEXT NOT NULL DEFAULT 'PENDING',
+      last_screened_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_ubos_entity
+        FOREIGN KEY (entity_id) REFERENCES entity(entity_id),
+      CONSTRAINT chk_ubos_nationality
+        CHECK (length(trim(nationality)) = 2),
+      CONSTRAINT chk_ubos_country_of_residence
+        CHECK (length(trim(country_of_residence)) = 2),
+      CONSTRAINT chk_ubos_id_issuing_country
+        CHECK (id_issuing_country IS NULL OR length(trim(id_issuing_country)) = 2),
+      CONSTRAINT chk_ubos_id_type
+        CHECK (id_type IN ('PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE')),
+      CONSTRAINT chk_ubos_control_type
+        CHECK (
+          control_type IS NULL OR
+          control_type IN ('DIRECT_OWNERSHIP', 'INDIRECT', 'CONTROL_BY_OTHER_MEANS')
+        ),
+      CONSTRAINT chk_ubos_screening_status
+        CHECK (screening_status IN ('PENDING', 'CLEAR', 'FLAGGED', 'ESCALATED')),
+      CONSTRAINT chk_ownership_pct
+        CHECK (ownership_pct >= 0 AND ownership_pct <= 100),
+      CONSTRAINT chk_ubos_is_pep
+        CHECK (is_pep IN (0, 1)),
+      CONSTRAINT chk_ubos_is_sanctioned
+        CHECK (is_sanctioned IN (0, 1)),
+      CONSTRAINT chk_ubos_is_adverse_media
+        CHECK (is_adverse_media IN (0, 1))
+    );
+    CREATE INDEX IF NOT EXISTS ubos_entity_id_idx ON ubos(entity_id);
   `);
   const workspaceDraftColumns = database
     .prepare("PRAGMA table_info(workspace_drafts)")
@@ -1406,6 +1480,20 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const uboRoute = matchUboRoute(url);
+    if (request.method === "GET" && uboRoute) {
+      const responseBody = uboRoute.uboId
+        ? getUboById(db, uboRoute.uboId)
+        : listUbos(db, url.searchParams.get("entity_id"));
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (
       request.method === "GET" &&
       url.pathname === "/api/platform/snapshot"
@@ -1477,6 +1565,16 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && matchesRoute(url, "/api/ubos", "/api/v1/ubos")) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = createUbo(db, payload);
+      const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/checkKYC") {
       const rawBody = await readRequestBody(request);
       const checkKycRequest = JSON.parse(rawBody);
@@ -1513,11 +1611,37 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "PUT" && uboRoute?.uboId) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = updateUbo(db, uboRoute.uboId, payload);
+      const statusCode = responseBody.error === "UBO not found."
+        ? 404
+        : responseBody.error
+          ? 400
+          : 200;
+      const result = json(responseBody, statusCode);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "DELETE" && entityRoute?.entityId) {
       const responseBody = deleteEntity(db, entityRoute.entityId);
       const result = json(
         responseBody,
         responseBody.error === "Entity not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "DELETE" && uboRoute?.uboId) {
+      const responseBody = deleteUbo(db, uboRoute.uboId);
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO not found." ? 404 : 200,
       );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
