@@ -30,6 +30,13 @@ import {
   listUbos,
   updateUbo,
 } from "./uboApi.js";
+import {
+  createUboOwnershipChain,
+  deleteUboOwnershipChain,
+  getUboOwnershipChainById,
+  listUboOwnershipChains,
+  updateUboOwnershipChain,
+} from "./uboOwnershipChainApi.js";
 import { KycFailedError } from "./agents/kycAgent.js";
 import {
   collectSubmissionIssues,
@@ -126,7 +133,7 @@ function json(value, statusCode = 200) {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,PUT,POST,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,PUT,POST,DELETE,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     },
     body: JSON.stringify(value),
@@ -158,6 +165,18 @@ function matchUboRoute(url) {
 
   return {
     uboId: match[1] ? decodeURIComponent(match[1]) : null,
+  };
+}
+
+function matchUboOwnershipChainRoute(url) {
+  const match = url.pathname.match(/^\/api(?:\/v1)?\/ubo-ownership-chain(?:\/([^/]+))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    chainId: match[1] ? decodeURIComponent(match[1]) : null,
   };
 }
 
@@ -306,6 +325,34 @@ async function initializeDatabase() {
         CHECK (is_adverse_media IN (0, 1))
     );
     CREATE INDEX IF NOT EXISTS ubos_entity_id_idx ON ubos(entity_id);
+    CREATE TABLE IF NOT EXISTS ubo_ownership_chain (
+      chain_id TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        '4' || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        lower(hex(randomblob(6)))
+      ),
+      ubo_id TEXT NOT NULL REFERENCES ubos(ubo_id),
+      parent_entity_id TEXT NOT NULL REFERENCES entity(entity_id),
+      child_entity_id TEXT NOT NULL REFERENCES entity(entity_id),
+      ownership_pct NUMERIC(5,2) NOT NULL,
+      chain_depth INTEGER NOT NULL DEFAULT 1,
+      effective_ownership NUMERIC(5,2),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_ubo_ownership_chain_ownership_pct
+        CHECK (ownership_pct >= 0 AND ownership_pct <= 100),
+      CONSTRAINT chk_ubo_ownership_chain_effective_ownership
+        CHECK (effective_ownership IS NULL OR (effective_ownership >= 0 AND effective_ownership <= 100)),
+      CONSTRAINT chk_ubo_ownership_chain_depth
+        CHECK (chain_depth >= 1)
+    );
+    CREATE INDEX IF NOT EXISTS ubo_ownership_chain_ubo_id_idx
+      ON ubo_ownership_chain(ubo_id);
+    CREATE INDEX IF NOT EXISTS ubo_ownership_chain_parent_entity_id_idx
+      ON ubo_ownership_chain(parent_entity_id);
+    CREATE INDEX IF NOT EXISTS ubo_ownership_chain_child_entity_id_idx
+      ON ubo_ownership_chain(child_entity_id);
   `);
   const workspaceDraftColumns = database
     .prepare("PRAGMA table_info(workspace_drafts)")
@@ -1504,6 +1551,24 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const uboOwnershipChainRoute = matchUboOwnershipChainRoute(url);
+    if (request.method === "GET" && uboOwnershipChainRoute) {
+      const responseBody = uboOwnershipChainRoute.chainId
+        ? getUboOwnershipChainById(db, uboOwnershipChainRoute.chainId)
+        : listUboOwnershipChains(db, {
+            ubo_id: url.searchParams.get("ubo_id"),
+            parent_entity_id: url.searchParams.get("parent_entity_id"),
+            child_entity_id: url.searchParams.get("child_entity_id"),
+          });
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO ownership chain not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (
       request.method === "GET" &&
       url.pathname === "/api/platform/snapshot"
@@ -1585,6 +1650,23 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (
+      request.method === "POST" &&
+      matchesRoute(
+        url,
+        "/api/ubo-ownership-chain",
+        "/api/v1/ubo-ownership-chain",
+      )
+    ) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = createUboOwnershipChain(db, payload);
+      const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/checkKYC") {
       const rawBody = await readRequestBody(request);
       const checkKycRequest = JSON.parse(rawBody);
@@ -1636,6 +1718,25 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "PUT" && uboOwnershipChainRoute?.chainId) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = updateUboOwnershipChain(
+        db,
+        uboOwnershipChainRoute.chainId,
+        payload,
+      );
+      const statusCode = responseBody.error === "UBO ownership chain not found."
+        ? 404
+        : responseBody.error
+          ? 400
+          : 200;
+      const result = json(responseBody, statusCode);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "DELETE" && entityRoute?.entityId) {
       const responseBody = deleteEntity(db, entityRoute.entityId);
       const result = json(
@@ -1652,6 +1753,20 @@ const server = createServer(async (request, response) => {
       const result = json(
         responseBody,
         responseBody.error === "UBO not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "DELETE" && uboOwnershipChainRoute?.chainId) {
+      const responseBody = deleteUboOwnershipChain(
+        db,
+        uboOwnershipChainRoute.chainId,
+      );
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO ownership chain not found." ? 404 : 200,
       );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
