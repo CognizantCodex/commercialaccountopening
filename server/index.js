@@ -31,6 +31,13 @@ import {
   updateUbo,
 } from "./uboApi.js";
 import {
+  createUboDocument,
+  deleteUboDocument,
+  getUboDocumentById,
+  listUboDocuments,
+  updateUboDocument,
+} from "./uboDocumentsApi.js";
+import {
   createUboOwnershipChain,
   deleteUboOwnershipChain,
   getUboOwnershipChainById,
@@ -165,6 +172,18 @@ function matchUboRoute(url) {
 
   return {
     uboId: match[1] ? decodeURIComponent(match[1]) : null,
+  };
+}
+
+function matchUboDocumentRoute(url) {
+  const match = url.pathname.match(/^\/api(?:\/v1)?\/ubo-documents(?:\/([^/]+))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    docId: match[1] ? decodeURIComponent(match[1]) : null,
   };
 }
 
@@ -325,6 +344,34 @@ async function initializeDatabase() {
         CHECK (is_adverse_media IN (0, 1))
     );
     CREATE INDEX IF NOT EXISTS ubos_entity_id_idx ON ubos(entity_id);
+    CREATE TABLE IF NOT EXISTS ubo_documents (
+      doc_id TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        '4' || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        lower(hex(randomblob(6)))
+      ),
+      ubo_id TEXT NOT NULL REFERENCES ubos(ubo_id),
+      doc_type VARCHAR(50) NOT NULL,
+      file_ref VARCHAR(500) NOT NULL,
+      file_hash VARCHAR(64),
+      upload_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+      verified_by TEXT,
+      verified_at TEXT,
+      expiry_date TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_ubo_documents_doc_type
+        CHECK (doc_type IN ('ID_PROOF', 'ADDRESS_PROOF', 'OWNERSHIP_CERT')),
+      CONSTRAINT chk_ubo_documents_upload_status
+        CHECK (upload_status IN ('PENDING', 'VERIFIED', 'REJECTED')),
+      CONSTRAINT chk_ubo_documents_file_hash
+        CHECK (file_hash IS NULL OR length(file_hash) = 64)
+    );
+    CREATE INDEX IF NOT EXISTS ubo_documents_ubo_id_idx ON ubo_documents(ubo_id);
+    CREATE INDEX IF NOT EXISTS ubo_documents_doc_type_idx ON ubo_documents(doc_type);
+    CREATE INDEX IF NOT EXISTS ubo_documents_upload_status_idx
+      ON ubo_documents(upload_status);
     CREATE TABLE IF NOT EXISTS ubo_ownership_chain (
       chain_id TEXT PRIMARY KEY DEFAULT (
         lower(hex(randomblob(4))) || '-' ||
@@ -1551,6 +1598,24 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const uboDocumentRoute = matchUboDocumentRoute(url);
+    if (request.method === "GET" && uboDocumentRoute) {
+      const responseBody = uboDocumentRoute.docId
+        ? getUboDocumentById(db, uboDocumentRoute.docId)
+        : listUboDocuments(db, {
+            ubo_id: url.searchParams.get("ubo_id"),
+            doc_type: url.searchParams.get("doc_type"),
+            upload_status: url.searchParams.get("upload_status"),
+          });
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO document not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     const uboOwnershipChainRoute = matchUboOwnershipChainRoute(url);
     if (request.method === "GET" && uboOwnershipChainRoute) {
       const responseBody = uboOwnershipChainRoute.chainId
@@ -1652,6 +1717,19 @@ const server = createServer(async (request, response) => {
 
     if (
       request.method === "POST" &&
+      matchesRoute(url, "/api/ubo-documents", "/api/v1/ubo-documents")
+    ) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = createUboDocument(db, payload);
+      const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
       matchesRoute(
         url,
         "/api/ubo-ownership-chain",
@@ -1718,6 +1796,21 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "PUT" && uboDocumentRoute?.docId) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = updateUboDocument(db, uboDocumentRoute.docId, payload);
+      const statusCode = responseBody.error === "UBO document not found."
+        ? 404
+        : responseBody.error
+          ? 400
+          : 200;
+      const result = json(responseBody, statusCode);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "PUT" && uboOwnershipChainRoute?.chainId) {
       const rawBody = await readRequestBody(request);
       const payload = JSON.parse(rawBody);
@@ -1753,6 +1846,17 @@ const server = createServer(async (request, response) => {
       const result = json(
         responseBody,
         responseBody.error === "UBO not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "DELETE" && uboDocumentRoute?.docId) {
+      const responseBody = deleteUboDocument(db, uboDocumentRoute.docId);
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO document not found." ? 404 : 200,
       );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
