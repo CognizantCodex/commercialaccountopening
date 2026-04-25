@@ -47,6 +47,22 @@ body {
   color: var(--ink);
 }
 
+body.customer-account-route {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(0, 198, 255, 0.1), transparent 18%),
+    radial-gradient(circle at 82% 10%, rgba(24, 178, 255, 0.07), transparent 16%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 44%, #eef5ff 100%);
+  color: #091a44;
+}
+
+body.kyc-fabric-route {
+  background:
+    radial-gradient(circle at 14% 18%, rgba(63, 199, 255, 0.22), transparent 22%),
+    radial-gradient(circle at 82% 12%, rgba(123, 230, 212, 0.16), transparent 20%),
+    radial-gradient(circle at 74% 70%, rgba(40, 82, 190, 0.2), transparent 26%),
+    linear-gradient(180deg, #04101f 0%, #071730 42%, #0a1731 100%);
+}
+
 button,
 input,
 textarea,
@@ -94,6 +110,28 @@ button {
   font-family: "Manrope", sans-serif;
 }
 
+.application-shell.customer-account-shell {
+  --ink: #091a44;
+  --ink-soft: #5d6f99;
+  --paper: #f8fbff;
+  --surface: rgba(255, 255, 255, 0.96);
+  --surface-alt: #eaf2ff;
+  --surface-strong: #d9e9ff;
+  --line: rgba(12, 49, 132, 0.12);
+  --line-strong: rgba(12, 49, 132, 0.2);
+  --navy: #10317c;
+  --navy-strong: #07173f;
+  --navy-deep: #04112e;
+  --accent: #18b2ff;
+  --accent-strong: #18b2ff;
+  --accent-soft: rgba(0, 198, 255, 0.14);
+  --accent-glow: rgba(0, 198, 255, 0.28);
+  --shadow: 0 28px 80px rgba(4, 17, 46, 0.12);
+  --shadow-soft: 0 20px 50px rgba(16, 49, 124, 0.08);
+  position: relative;
+  isolation: isolate;
+}
+
 .application-shell.admin-shell {
   --ink: #091a44;
   --ink-soft: #5d6f99;
@@ -135,6 +173,18 @@ button {
     radial-gradient(circle at 82% 12%, rgba(123, 230, 212, 0.16), transparent 20%),
     radial-gradient(circle at 74% 70%, rgba(40, 82, 190, 0.2), transparent 26%),
     linear-gradient(180deg, #04101f 0%, #071730 42%, #0a1731 100%);
+}
+
+.application-shell.customer-account-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(0, 198, 255, 0.12), transparent 18%),
+    radial-gradient(circle at 82% 10%, rgba(24, 178, 255, 0.08), transparent 16%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 44%, #eef5ff 100%);
 }
 
 .application-shell.admin-shell::before {
@@ -187,6 +237,16 @@ button {
   border-color: rgba(154, 198, 255, 0.16);
 }
 
+.customer-account-shell .hero-panel {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 42%),
+    radial-gradient(circle at 18% 18%, rgba(0, 198, 255, 0.16), transparent 24%),
+    radial-gradient(circle at 86% 16%, rgba(24, 178, 255, 0.12), transparent 16%),
+    linear-gradient(135deg, #f7fbff 0%, #e9f3ff 52%, #dcecff 100%);
+  color: var(--ink);
+  border-color: rgba(12, 49, 132, 0.12);
+}
+
 .admin-shell .hero-panel {
   min-height: 188px;
   padding: 28px 32px;
@@ -216,6 +276,10 @@ button {
   inset: auto -10% -32% auto;
   width: 28rem;
   background: radial-gradient(circle, rgba(123, 230, 212, 0.28), transparent 70%);
+}
+
+.customer-account-shell .hero-panel::after {
+  background: radial-gradient(circle, rgba(24, 178, 255, 0.18), transparent 68%);
 }
 
 .kyc-fabric-shell .hero-panel::before {
@@ -254,6 +318,10 @@ button {
 
 .hero-panel .brand-mark {
   color: #7fe1ff;
+}
+
+.customer-account-shell .hero-panel .brand-mark {
+  color: #18b2ff;
 }
 
 .kyc-fabric-shell .brand-mark,
@@ -2736,4 +2804,63 @@ button {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+html.light,
+html.light body.customer-account-route,
+html.light body.customer-account-route #root {
+  background: #f7fbff !important;
+  color: #091a44 !important;
+  color-scheme: light !important;
+}
+
+body.customer-account-route {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(0, 198, 255, 0.08), transparent 18%),
+    radial-gradient(circle at 82% 10%, rgba(24, 178, 255, 0.06), transparent 16%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 44%, #eef5ff 100%) !important;
+}
+
+.application-shell.corporate-light-shell::before {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(0, 198, 255, 0.08), transparent 18%),
+    radial-gradient(circle at 82% 10%, rgba(24, 178, 255, 0.06), transparent 16%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 44%, #eef5ff 100%) !important;
+}
+
+.application-shell.corporate-light-shell .hero-panel,
+.application-shell:not(.kyc-fabric-shell):not(.admin-shell) .hero-panel {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.5), transparent 42%),
+    radial-gradient(circle at 18% 18%, rgba(0, 198, 255, 0.14), transparent 24%),
+    radial-gradient(circle at 86% 16%, rgba(24, 178, 255, 0.1), transparent 16%),
+    linear-gradient(135deg, #ffffff 0%, #edf6ff 52%, #dfeeff 100%) !important;
+  color: #091a44 !important;
+  border-color: rgba(12, 49, 132, 0.12) !important;
+}
+
+.application-shell.corporate-light-shell .hero-panel .brand-mark,
+.application-shell:not(.kyc-fabric-shell):not(.admin-shell) .hero-panel .brand-mark {
+  color: #18b2ff !important;
+}
+
+.application-shell.corporate-light-shell .hero-copy p:last-child,
+.application-shell:not(.kyc-fabric-shell):not(.admin-shell) .hero-copy p:last-child {
+  color: #425989 !important;
+}
+
+.application-shell.corporate-light-shell .summary-chip,
+.application-shell:not(.kyc-fabric-shell):not(.admin-shell) .summary-chip {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(239, 246, 255, 0.94)) !important;
+  border-color: rgba(16, 49, 124, 0.12) !important;
+}
+
+.application-shell.corporate-light-shell .summary-chip span,
+.application-shell:not(.kyc-fabric-shell):not(.admin-shell) .summary-chip span {
+  color: #5d6f99 !important;
+}
+
+.application-shell.corporate-light-shell .summary-chip strong,
+.application-shell:not(.kyc-fabric-shell):not(.admin-shell) .summary-chip strong {
+  color: #091a44 !important;
 }

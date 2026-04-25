@@ -1,17 +1,27 @@
 openapi: 3.0.3
 info:
-  title: Commercial Account Opening API
-  version: 1.0.0
+  title: Commercial Account Opening Node API
+  version: 1.1.0
   description: >
     Swagger/OpenAPI contract for the Node.js API that supports the commercial
-    account opening application and its local screening integrations.
+    account opening workspace, local screening integrations, direct database
+    table helpers, and CRUD APIs for entities, UBOs, UBO documents, and UBO
+    ownership chains.
 servers:
   - url: http://localhost:8080
     description: Local Node API
 tags:
   - name: Health
   - name: Workspace
+  - name: Submissions
+  - name: Entities
+  - name: UBOs
+  - name: UBO Documents
+  - name: UBO Ownership Chains
   - name: Screening
+  - name: Platform
+  - name: Database Agents
+
 paths:
   /api/account-opening/health:
     get:
@@ -19,73 +29,1064 @@ paths:
       summary: Check API health
       operationId: getAccountOpeningHealth
       responses:
-        '200':
+        "200":
           description: Health status for the Node API.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: "#/components/schemas/HealthResponse"
+
   /api/account-opening/workspace:
     get:
       tags: [Workspace]
-      summary: Load the current account opening workspace draft
-      operationId: loadWorkspace
+      summary: Load a workspace draft or workspace database metadata
+      operationId: getAccountOpeningWorkspace
+      parameters:
+        - $ref: "#/components/parameters/draft"
+        - name: resource
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [tables, table-schema]
+          description: Optional metadata resource selector.
+        - name: tableName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Required when resource is table-schema.
       responses:
-        '200':
-          description: Current workspace state stored in SQLite.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkspaceState'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    put:
-      tags: [Workspace]
-      summary: Save the current account opening workspace draft
-      operationId: saveWorkspace
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/WorkspaceDraft'
-      responses:
-        '200':
-          description: Saved workspace state with refreshed timestamps.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkspaceState'
-        '500':
-          $ref: '#/components/responses/InvalidJson'
-  /api/account-opening/submit:
-    post:
-      tags: [Workspace]
-      summary: Submit the current workspace for orchestration
-      operationId: submitWorkspace
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/WorkspaceDraft'
-      responses:
-        '200':
-          description: Submitted workspace enriched with submission and orchestration results.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkspaceState'
-        '400':
-          description: Submission failed validation or KYC review.
+        "200":
+          description: Workspace draft, table list, or table schema.
           content:
             application/json:
               schema:
                 oneOf:
-                  - $ref: '#/components/schemas/ValidationErrorResponse'
-                  - $ref: '#/components/schemas/KycFailureResponse'
-        '500':
-          $ref: '#/components/responses/InvalidJson'
+                  - $ref: "#/components/schemas/WorkspaceState"
+                  - $ref: "#/components/schemas/TableListResponse"
+                  - $ref: "#/components/schemas/TableSchemaResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Workspace]
+      summary: Save a workspace draft or insert a database row through the table agent
+      operationId: putAccountOpeningWorkspace
+      parameters:
+        - $ref: "#/components/parameters/draft"
+        - name: resource
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [table-insert]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/WorkspaceDraft"
+                - $ref: "#/components/schemas/DatabaseInsertRequest"
+      responses:
+        "200":
+          description: Saved workspace.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceState"
+        "201":
+          description: Row inserted by the database insert agent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseInsertResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      tags: [Workspace]
+      summary: Insert a database row through the workspace table agent alias
+      operationId: postAccountOpeningWorkspace
+      parameters:
+        - name: resource
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [table-insert]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatabaseInsertRequest"
+      responses:
+        "201":
+          description: Row inserted by the database insert agent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseInsertResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/account-opening/drafts:
+    get:
+      tags: [Workspace]
+      summary: List saved draft applications
+      operationId: listAccountOpeningDrafts
+      responses:
+        "200":
+          description: Saved draft summaries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [drafts]
+                properties:
+                  drafts:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DraftSummary"
+
+  /api/account-opening/submissions:
+    get:
+      tags: [Submissions]
+      summary: List submitted applications
+      operationId: listAccountOpeningSubmissions
+      responses:
+        "200":
+          description: Submitted application summaries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [submissions]
+                properties:
+                  submissions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SubmissionSummary"
+
+  /api/account-opening/submit:
+    post:
+      tags: [Submissions]
+      summary: Submit a workspace for orchestration
+      operationId: submitAccountOpeningWorkspace
+      parameters:
+        - $ref: "#/components/parameters/draft"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceDraft"
+      responses:
+        "200":
+          description: Submitted workspace with orchestration result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceState"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/entities:
+    get:
+      tags: [Entities]
+      summary: List legal entities
+      operationId: listEntities
+      responses:
+        "200":
+          description: Entity list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entities]
+                properties:
+                  entities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entity"
+    post:
+      tags: [Entities]
+      summary: Create a legal entity
+      operationId: createEntity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntityCreateRequest"
+      responses:
+        "201":
+          description: Entity created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entity]
+                properties:
+                  entity:
+                    $ref: "#/components/schemas/Entity"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/entities/{entityId}:
+    get:
+      tags: [Entities]
+      summary: Read a legal entity
+      operationId: getEntityById
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      responses:
+        "200":
+          description: Entity record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entity]
+                properties:
+                  entity:
+                    $ref: "#/components/schemas/Entity"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Entities]
+      summary: Update a legal entity
+      operationId: updateEntity
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntityUpdateRequest"
+      responses:
+        "200":
+          description: Updated entity.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entity]
+                properties:
+                  entity:
+                    $ref: "#/components/schemas/Entity"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Entities]
+      summary: Delete a legal entity
+      operationId: deleteEntity
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      responses:
+        "200":
+          description: Deleted entity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteEntityResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/entities:
+    get:
+      tags: [Entities]
+      summary: List legal entities using the v1 alias
+      operationId: listEntitiesV1
+      responses:
+        "200":
+          description: Entity list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entities]
+                properties:
+                  entities:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entity"
+    post:
+      tags: [Entities]
+      summary: Create a legal entity using the v1 alias
+      operationId: createEntityV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntityCreateRequest"
+      responses:
+        "201":
+          description: Entity created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entity]
+                properties:
+                  entity:
+                    $ref: "#/components/schemas/Entity"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/entities/{entityId}:
+    get:
+      tags: [Entities]
+      summary: Read a legal entity using the v1 alias
+      operationId: getEntityByIdV1
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      responses:
+        "200":
+          description: Entity record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entity]
+                properties:
+                  entity:
+                    $ref: "#/components/schemas/Entity"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [Entities]
+      summary: Update a legal entity using the v1 alias
+      operationId: updateEntityV1
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EntityUpdateRequest"
+      responses:
+        "200":
+          description: Updated entity.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entity]
+                properties:
+                  entity:
+                    $ref: "#/components/schemas/Entity"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Entities]
+      summary: Delete a legal entity using the v1 alias
+      operationId: deleteEntityV1
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      responses:
+        "200":
+          description: Deleted entity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteEntityResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/ubos:
+    get:
+      tags: [UBOs]
+      summary: List UBOs
+      operationId: listUbos
+      parameters:
+        - name: entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: UBO list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubos]
+                properties:
+                  ubos:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ubo"
+    post:
+      tags: [UBOs]
+      summary: Create a UBO
+      operationId: createUbo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboCreateRequest"
+      responses:
+        "201":
+          description: UBO created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo]
+                properties:
+                  ubo:
+                    $ref: "#/components/schemas/Ubo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/ubos/{uboId}:
+    get:
+      tags: [UBOs]
+      summary: Read a UBO
+      operationId: getUboById
+      parameters:
+        - $ref: "#/components/parameters/uboId"
+      responses:
+        "200":
+          description: UBO record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo]
+                properties:
+                  ubo:
+                    $ref: "#/components/schemas/Ubo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBOs]
+      summary: Update a UBO
+      operationId: updateUbo
+      parameters:
+        - $ref: "#/components/parameters/uboId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo]
+                properties:
+                  ubo:
+                    $ref: "#/components/schemas/Ubo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBOs]
+      summary: Delete a UBO
+      operationId: deleteUbo
+      parameters:
+        - $ref: "#/components/parameters/uboId"
+      responses:
+        "200":
+          description: Deleted UBO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ubos:
+    get:
+      tags: [UBOs]
+      summary: List UBOs using the v1 alias
+      operationId: listUbosV1
+      parameters:
+        - name: entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: UBO list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubos]
+                properties:
+                  ubos:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ubo"
+    post:
+      tags: [UBOs]
+      summary: Create a UBO using the v1 alias
+      operationId: createUboV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboCreateRequest"
+      responses:
+        "201":
+          description: UBO created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo]
+                properties:
+                  ubo:
+                    $ref: "#/components/schemas/Ubo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/ubos/{uboId}:
+    get:
+      tags: [UBOs]
+      summary: Read a UBO using the v1 alias
+      operationId: getUboByIdV1
+      parameters:
+        - $ref: "#/components/parameters/uboId"
+      responses:
+        "200":
+          description: UBO record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo]
+                properties:
+                  ubo:
+                    $ref: "#/components/schemas/Ubo"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBOs]
+      summary: Update a UBO using the v1 alias
+      operationId: updateUboV1
+      parameters:
+        - $ref: "#/components/parameters/uboId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo]
+                properties:
+                  ubo:
+                    $ref: "#/components/schemas/Ubo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBOs]
+      summary: Delete a UBO using the v1 alias
+      operationId: deleteUboV1
+      parameters:
+        - $ref: "#/components/parameters/uboId"
+      responses:
+        "200":
+          description: Deleted UBO.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/ubo-documents:
+    get:
+      tags: [UBO Documents]
+      summary: List UBO documents
+      operationId: listUboDocuments
+      parameters:
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: doc_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboDocumentType"
+        - name: upload_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboDocumentUploadStatus"
+      responses:
+        "200":
+          description: UBO document list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_documents]
+                properties:
+                  ubo_documents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboDocument"
+    post:
+      tags: [UBO Documents]
+      summary: Create a UBO document
+      operationId: createUboDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboDocumentCreateRequest"
+      responses:
+        "201":
+          description: UBO document created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_document]
+                properties:
+                  ubo_document:
+                    $ref: "#/components/schemas/UboDocument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/ubo-documents/{docId}:
+    get:
+      tags: [UBO Documents]
+      summary: Read a UBO document
+      operationId: getUboDocumentById
+      parameters:
+        - $ref: "#/components/parameters/docId"
+      responses:
+        "200":
+          description: UBO document record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_document]
+                properties:
+                  ubo_document:
+                    $ref: "#/components/schemas/UboDocument"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Documents]
+      summary: Update a UBO document
+      operationId: updateUboDocument
+      parameters:
+        - $ref: "#/components/parameters/docId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboDocumentUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO document.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_document]
+                properties:
+                  ubo_document:
+                    $ref: "#/components/schemas/UboDocument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Documents]
+      summary: Delete a UBO document
+      operationId: deleteUboDocument
+      parameters:
+        - $ref: "#/components/parameters/docId"
+      responses:
+        "200":
+          description: Deleted UBO document.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboDocumentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ubo-documents:
+    get:
+      tags: [UBO Documents]
+      summary: List UBO documents using the v1 alias
+      operationId: listUboDocumentsV1
+      parameters:
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: doc_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboDocumentType"
+        - name: upload_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboDocumentUploadStatus"
+      responses:
+        "200":
+          description: UBO document list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_documents]
+                properties:
+                  ubo_documents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboDocument"
+    post:
+      tags: [UBO Documents]
+      summary: Create a UBO document using the v1 alias
+      operationId: createUboDocumentV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboDocumentCreateRequest"
+      responses:
+        "201":
+          description: UBO document created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_document]
+                properties:
+                  ubo_document:
+                    $ref: "#/components/schemas/UboDocument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/ubo-documents/{docId}:
+    get:
+      tags: [UBO Documents]
+      summary: Read a UBO document using the v1 alias
+      operationId: getUboDocumentByIdV1
+      parameters:
+        - $ref: "#/components/parameters/docId"
+      responses:
+        "200":
+          description: UBO document record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_document]
+                properties:
+                  ubo_document:
+                    $ref: "#/components/schemas/UboDocument"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Documents]
+      summary: Update a UBO document using the v1 alias
+      operationId: updateUboDocumentV1
+      parameters:
+        - $ref: "#/components/parameters/docId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboDocumentUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO document.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_document]
+                properties:
+                  ubo_document:
+                    $ref: "#/components/schemas/UboDocument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Documents]
+      summary: Delete a UBO document using the v1 alias
+      operationId: deleteUboDocumentV1
+      parameters:
+        - $ref: "#/components/parameters/docId"
+      responses:
+        "200":
+          description: Deleted UBO document.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboDocumentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/ubo-ownership-chain:
+    get:
+      tags: [UBO Ownership Chains]
+      summary: List UBO ownership-chain records
+      operationId: listUboOwnershipChains
+      parameters:
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: parent_entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: child_entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Ownership-chain list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chains]
+                properties:
+                  ownership_chains:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboOwnershipChain"
+    post:
+      tags: [UBO Ownership Chains]
+      summary: Create a UBO ownership-chain record
+      operationId: createUboOwnershipChain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboOwnershipChainCreateRequest"
+      responses:
+        "201":
+          description: Ownership-chain record created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chain]
+                properties:
+                  ownership_chain:
+                    $ref: "#/components/schemas/UboOwnershipChain"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/ubo-ownership-chain/{chainId}:
+    get:
+      tags: [UBO Ownership Chains]
+      summary: Read a UBO ownership-chain record
+      operationId: getUboOwnershipChainById
+      parameters:
+        - $ref: "#/components/parameters/chainId"
+      responses:
+        "200":
+          description: Ownership-chain record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chain]
+                properties:
+                  ownership_chain:
+                    $ref: "#/components/schemas/UboOwnershipChain"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Ownership Chains]
+      summary: Update a UBO ownership-chain record
+      operationId: updateUboOwnershipChain
+      parameters:
+        - $ref: "#/components/parameters/chainId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboOwnershipChainUpdateRequest"
+      responses:
+        "200":
+          description: Updated ownership-chain record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chain]
+                properties:
+                  ownership_chain:
+                    $ref: "#/components/schemas/UboOwnershipChain"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Ownership Chains]
+      summary: Delete a UBO ownership-chain record
+      operationId: deleteUboOwnershipChain
+      parameters:
+        - $ref: "#/components/parameters/chainId"
+      responses:
+        "200":
+          description: Deleted ownership-chain record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboOwnershipChainResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ubo-ownership-chain:
+    get:
+      tags: [UBO Ownership Chains]
+      summary: List UBO ownership-chain records using the v1 alias
+      operationId: listUboOwnershipChainsV1
+      responses:
+        "200":
+          description: Ownership-chain list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chains]
+                properties:
+                  ownership_chains:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboOwnershipChain"
+    post:
+      tags: [UBO Ownership Chains]
+      summary: Create a UBO ownership-chain record using the v1 alias
+      operationId: createUboOwnershipChainV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboOwnershipChainCreateRequest"
+      responses:
+        "201":
+          description: Ownership-chain record created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chain]
+                properties:
+                  ownership_chain:
+                    $ref: "#/components/schemas/UboOwnershipChain"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/ubo-ownership-chain/{chainId}:
+    get:
+      tags: [UBO Ownership Chains]
+      summary: Read a UBO ownership-chain record using the v1 alias
+      operationId: getUboOwnershipChainByIdV1
+      parameters:
+        - $ref: "#/components/parameters/chainId"
+      responses:
+        "200":
+          description: Ownership-chain record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chain]
+                properties:
+                  ownership_chain:
+                    $ref: "#/components/schemas/UboOwnershipChain"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Ownership Chains]
+      summary: Update a UBO ownership-chain record using the v1 alias
+      operationId: updateUboOwnershipChainV1
+      parameters:
+        - $ref: "#/components/parameters/chainId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboOwnershipChainUpdateRequest"
+      responses:
+        "200":
+          description: Updated ownership-chain record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownership_chain]
+                properties:
+                  ownership_chain:
+                    $ref: "#/components/schemas/UboOwnershipChain"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Ownership Chains]
+      summary: Delete a UBO ownership-chain record using the v1 alias
+      operationId: deleteUboOwnershipChainV1
+      parameters:
+        - $ref: "#/components/parameters/chainId"
+      responses:
+        "200":
+          description: Deleted ownership-chain record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboOwnershipChainResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /api/checkKYC:
     post:
       tags: [Screening]
@@ -96,16 +1097,57 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CheckKycRequest'
+              $ref: "#/components/schemas/CheckKycRequest"
       responses:
-        '200':
+        "200":
           description: Local CheckKYC contract result.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckKycContractResponse'
-        '500':
-          $ref: '#/components/responses/InvalidJson'
+                $ref: "#/components/schemas/CheckKycContractResponse"
+        "500":
+          $ref: "#/components/responses/InvalidJson"
+
+  /api/checkKYB:
+    post:
+      tags: [Screening]
+      summary: Validate KYB details against business information records
+      operationId: processCheckKybRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckKybRequest"
+      responses:
+        "200":
+          description: KYB verification result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckKybResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/checkKYB:
+    post:
+      tags: [Screening]
+      summary: Validate KYB details using the v1 alias
+      operationId: processCheckKybRequestV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckKybRequest"
+      responses:
+        "200":
+          description: KYB verification result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckKybResponse"
+
   /api/check-kyc/applications:
     post:
       tags: [Screening]
@@ -116,16 +1158,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WorkspaceDraft'
+              $ref: "#/components/schemas/WorkspaceDraft"
       responses:
-        '200':
+        "200":
           description: Wrapped CheckKYC request and response details.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckKycApplicationResult'
-        '500':
-          $ref: '#/components/responses/InvalidJson'
+                $ref: "#/components/schemas/CheckKycApplicationResult"
+
   /api/check-risk/applications:
     post:
       tags: [Screening]
@@ -136,34 +1177,253 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/WorkspaceDraft'
+              $ref: "#/components/schemas/WorkspaceDraft"
       responses:
-        '200':
+        "200":
           description: Derived or provider-backed checkRisk result.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckRiskResponse'
-        '500':
-          $ref: '#/components/responses/InvalidJson'
+                $ref: "#/components/schemas/CheckRiskResponse"
+
+  /api/platform/snapshot:
+    get:
+      tags: [Platform]
+      summary: Get the KYC-Fabric platform snapshot
+      operationId: getPlatformSnapshot
+      responses:
+        "200":
+          description: Aggregated submitted-application snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformSnapshot"
+
+  /api/account-opening/platform-snapshot:
+    get:
+      tags: [Platform]
+      summary: Get the account-opening platform snapshot alias
+      operationId: getAccountOpeningPlatformSnapshot
+      responses:
+        "200":
+          description: Aggregated submitted-application snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformSnapshot"
+
+  /api/account-opening/tables:
+    get:
+      tags: [Database Agents]
+      summary: List insertable database tables
+      operationId: listDatabaseTablesAccountOpening
+      responses:
+        "200":
+          description: Database table names.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TableListResponse"
+
+  /api/agents/database/tables:
+    get:
+      tags: [Database Agents]
+      summary: List insertable database tables using the agent alias
+      operationId: listDatabaseTablesAgent
+      responses:
+        "200":
+          description: Database table names.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TableListResponse"
+
+  /api/account-opening/agents/database/tables:
+    get:
+      tags: [Database Agents]
+      summary: List insertable database tables using the account-opening agent alias
+      operationId: listDatabaseTablesAccountOpeningAgent
+      responses:
+        "200":
+          description: Database table names.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TableListResponse"
+
+  /api/account-opening/table-schema:
+    get:
+      tags: [Database Agents]
+      summary: Describe a database table
+      operationId: describeDatabaseTableAccountOpening
+      parameters:
+        - $ref: "#/components/parameters/tableName"
+      responses:
+        "200":
+          description: Table schema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TableSchemaResponse"
+
+  /api/agents/database/schema:
+    get:
+      tags: [Database Agents]
+      summary: Describe a database table using the agent alias
+      operationId: describeDatabaseTableAgent
+      parameters:
+        - $ref: "#/components/parameters/tableName"
+      responses:
+        "200":
+          description: Table schema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TableSchemaResponse"
+
+  /api/account-opening/agents/database/schema:
+    get:
+      tags: [Database Agents]
+      summary: Describe a database table using the account-opening agent alias
+      operationId: describeDatabaseTableAccountOpeningAgent
+      parameters:
+        - $ref: "#/components/parameters/tableName"
+      responses:
+        "200":
+          description: Table schema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TableSchemaResponse"
+
+  /api/account-opening/table-insert:
+    post:
+      tags: [Database Agents]
+      summary: Insert a row into an allowed database table
+      operationId: insertDatabaseRowAccountOpening
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatabaseInsertRequest"
+      responses:
+        "201":
+          description: Insert result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseInsertResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/agents/database/insert:
+    post:
+      tags: [Database Agents]
+      summary: Insert a row using the agent alias
+      operationId: insertDatabaseRowAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatabaseInsertRequest"
+      responses:
+        "201":
+          description: Insert result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseInsertResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/account-opening/agents/database/insert:
+    post:
+      tags: [Database Agents]
+      summary: Insert a row using the account-opening agent alias
+      operationId: insertDatabaseRowAccountOpeningAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatabaseInsertRequest"
+      responses:
+        "201":
+          description: Insert result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseInsertResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
 components:
+  parameters:
+    draft:
+      name: draft
+      in: query
+      required: false
+      schema:
+        type: string
+    tableName:
+      name: tableName
+      in: query
+      required: true
+      schema:
+        type: string
+    entityId:
+      name: entityId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    uboId:
+      name: uboId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    docId:
+      name: docId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    chainId:
+      name: chainId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
   responses:
+    BadRequest:
+      description: Validation failed or request body was not accepted.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     InvalidJson:
       description: The API could not parse the JSON request body.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             error: Invalid JSON payload.
-    InternalServerError:
-      description: Unexpected server-side failure.
+    NotFound:
+      description: Resource not found.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
-          example:
-            error: Unexpected server error.
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
     HealthResponse:
       type: object
@@ -178,489 +1438,607 @@ components:
         storage:
           type: string
           example: sqlite
+
     ErrorResponse:
       type: object
       required: [error]
       properties:
         error:
           type: string
-    ValidationIssue:
-      type: object
-      required: [fieldKey, message]
-      properties:
-        fieldKey:
-          type: string
-        message:
-          type: string
-    ValidationErrorResponse:
-      allOf:
-        - $ref: '#/components/schemas/ErrorResponse'
-        - type: object
-          properties:
-            issues:
-              type: array
-              items:
-                $ref: '#/components/schemas/ValidationIssue'
-    KycFailureResponse:
-      allOf:
-        - $ref: '#/components/schemas/ValidationErrorResponse'
-        - type: object
-          properties:
-            integration:
-              type: object
-              description: Captured upstream KYC integration payload on failure.
-              additionalProperties: true
-    Step:
-      type: object
-      required: [id, label, eyebrow, title, detail]
-      properties:
-        id:
-          type: string
-        label:
-          type: string
-        eyebrow:
-          type: string
-        title:
-          type: string
-        detail:
-          type: string
-    DocumentOption:
-      type: object
-      required: [key, title, detail]
-      properties:
-        key:
-          type: string
-        title:
-          type: string
-        detail:
-          type: string
-    DeclarationOption:
-      type: object
-      required: [key, title, detail, required]
-      properties:
-        key:
-          type: string
-        title:
-          type: string
-        detail:
-          type: string
-        required:
-          type: boolean
-    CompanyInfo:
-      type: object
-      required:
-        - legalName
-        - tradingName
-        - entityType
-        - registrationNumber
-        - taxId
-        - incorporationDate
-        - incorporationState
-        - incorporationCountry
-        - industry
-        - website
-        - annualRevenue
-        - employeeCount
-      properties:
-        legalName:
-          type: string
-        tradingName:
-          type: string
-        entityType:
-          type: string
-        registrationNumber:
-          type: string
-        taxId:
-          type: string
-        incorporationDate:
-          type: string
-          format: date
-        incorporationState:
-          type: string
-        incorporationCountry:
-          type: string
-        industry:
-          type: string
-        website:
-          type: string
-        annualRevenue:
-          type: string
-        employeeCount:
-          type: string
-    PrimaryContact:
-      type: object
-      required: [fullName, title, email, phone, extension]
-      properties:
-        fullName:
-          type: string
-        title:
-          type: string
-        email:
-          type: string
-          format: email
-        phone:
-          type: string
-        extension:
-          type: string
-    Addresses:
-      type: object
-      required:
-        - registeredLine1
-        - registeredLine2
-        - city
-        - state
-        - postalCode
-        - country
-        - operatingSameAsRegistered
-        - operatingLine1
-        - operatingLine2
-        - operatingCity
-        - operatingState
-        - operatingPostalCode
-        - operatingCountry
-      properties:
-        registeredLine1:
-          type: string
-        registeredLine2:
-          type: string
-        city:
-          type: string
-        state:
-          type: string
-        postalCode:
-          type: string
-        country:
-          type: string
-        operatingSameAsRegistered:
-          type: boolean
-        operatingLine1:
-          type: string
-        operatingLine2:
-          type: string
-        operatingCity:
-          type: string
-        operatingState:
-          type: string
-        operatingPostalCode:
-          type: string
-        operatingCountry:
-          type: string
-    BankingProfile:
-      type: object
-      required:
-        - accountPurpose
-        - requestedProducts
-        - expectedOpeningDeposit
-        - monthlyIncoming
-        - monthlyOutgoing
-        - onlineBankingUsers
-        - internationalActivity
-        - jurisdictionsInScope
-        - needsCommercialCards
-      properties:
-        accountPurpose:
-          type: string
-        requestedProducts:
+        issues:
           type: array
           items:
-            type: string
-        expectedOpeningDeposit:
+            oneOf:
+              - type: string
+              - type: object
+                additionalProperties: true
+        code:
           type: string
-        monthlyIncoming:
-          type: string
-        monthlyOutgoing:
-          type: string
-        onlineBankingUsers:
-          type: string
-        internationalActivity:
-          type: boolean
-        jurisdictionsInScope:
-          type: string
-        needsCommercialCards:
-          type: boolean
-    BeneficialOwner:
-      type: object
-      required:
-        - id
-        - fullName
-        - title
-        - ownershipPercentage
-        - email
-        - phone
-        - isAuthorizedSigner
-      properties:
-        id:
-          type: string
-        fullName:
-          type: string
-        title:
-          type: string
-        ownershipPercentage:
-          type: string
-        email:
-          type: string
-          format: email
-        phone:
-          type: string
-        isAuthorizedSigner:
-          type: boolean
-    Documents:
-      type: object
-      required:
-        - certificateOfFormation
-        - taxIdLetter
-        - ownershipChart
-        - boardResolution
-        - signerIdentification
-        - addressProof
-      properties:
-        certificateOfFormation:
-          type: boolean
-        taxIdLetter:
-          type: boolean
-        ownershipChart:
-          type: boolean
-        boardResolution:
-          type: boolean
-        signerIdentification:
-          type: boolean
-        addressProof:
-          type: boolean
-    Declarations:
-      type: object
-      required:
-        - certifyAuthority
-        - certifyBeneficialOwners
-        - confirmTaxCompliance
-        - confirmTerms
-      properties:
-        certifyAuthority:
-          type: boolean
-        certifyBeneficialOwners:
-          type: boolean
-        confirmTaxCompliance:
-          type: boolean
-        confirmTerms:
-          type: boolean
-    SubmissionState:
-      type: object
-      required:
-        - status
-        - referenceId
-        - submittedAt
-        - overallDecision
-        - summary
-        - recommendedAction
-      properties:
-        status:
-          type: string
-          enum: [draft, submitted]
-        referenceId:
-          type: string
-          nullable: true
-        submittedAt:
-          type: string
-          format: date-time
-          nullable: true
-        overallDecision:
-          type: string
-        summary:
-          type: string
-        recommendedAction:
-          type: string
-    CheckResult:
-      type: object
-      required: [key, label, status, decision, summary, flags]
-      properties:
-        key:
-          type: string
-        label:
-          type: string
-        status:
-          type: string
-        decision:
-          type: string
-        summary:
-          type: string
-        flags:
-          type: array
-          items:
-            type: string
-        score:
-          type: number
-          nullable: true
-        integration:
-          type: object
-          nullable: true
-          additionalProperties: true
-    OrchestrationState:
-      type: object
-      required: [status, startedAt, completedAt, summary, checks]
-      properties:
-        status:
-          type: string
-        startedAt:
-          type: string
-          format: date-time
-          nullable: true
-        completedAt:
-          type: string
-          format: date-time
-          nullable: true
-        summary:
-          type: string
-        checks:
-          type: object
-          required: [kyc, aml, documentProcessing, risk]
-          properties:
-            kyc:
-              $ref: '#/components/schemas/CheckResult'
-            aml:
-              $ref: '#/components/schemas/CheckResult'
-            documentProcessing:
-              $ref: '#/components/schemas/CheckResult'
-            risk:
-              $ref: '#/components/schemas/CheckResult'
-        integrations:
-          type: object
-          nullable: true
-          additionalProperties: true
+
     WorkspaceDraft:
       type: object
-      required:
-        - brandName
-        - formTitle
-        - intro
-        - activeStep
-        - supportEmail
-        - steps
-        - entityTypeOptions
-        - industryOptions
-        - countryOptions
-        - stateOptions
-        - productOptions
-        - documentOptions
-        - declarationOptions
-        - companyInfo
-        - primaryContact
-        - addresses
-        - bankingProfile
-        - beneficialOwners
-        - documents
-        - declarations
-        - additionalNotes
-        - submission
-        - orchestration
-      properties:
-        brandName:
-          type: string
-        formTitle:
-          type: string
-        intro:
-          type: string
-        activeStep:
-          type: string
-        supportEmail:
-          type: string
-          format: email
-        steps:
-          type: array
-          items:
-            $ref: '#/components/schemas/Step'
-        entityTypeOptions:
-          type: array
-          items:
-            type: string
-        industryOptions:
-          type: array
-          items:
-            type: string
-        countryOptions:
-          type: array
-          items:
-            type: string
-        stateOptions:
-          type: array
-          items:
-            type: string
-        productOptions:
-          type: array
-          items:
-            type: string
-        documentOptions:
-          type: array
-          items:
-            $ref: '#/components/schemas/DocumentOption'
-        declarationOptions:
-          type: array
-          items:
-            $ref: '#/components/schemas/DeclarationOption'
-        companyInfo:
-          $ref: '#/components/schemas/CompanyInfo'
-        primaryContact:
-          $ref: '#/components/schemas/PrimaryContact'
-        addresses:
-          $ref: '#/components/schemas/Addresses'
-        bankingProfile:
-          $ref: '#/components/schemas/BankingProfile'
-        beneficialOwners:
-          type: array
-          items:
-            $ref: '#/components/schemas/BeneficialOwner'
-        documents:
-          $ref: '#/components/schemas/Documents'
-        declarations:
-          $ref: '#/components/schemas/Declarations'
-        additionalNotes:
-          type: string
-        submission:
-          $ref: '#/components/schemas/SubmissionState'
-        orchestration:
-          $ref: '#/components/schemas/OrchestrationState'
+      description: Account-opening workspace payload. The frontend owns most nested shape.
+      additionalProperties: true
+
     WorkspaceState:
       allOf:
-        - $ref: '#/components/schemas/WorkspaceDraft'
+        - $ref: "#/components/schemas/WorkspaceDraft"
         - type: object
           properties:
+            draftId:
+              type: string
             lastUpdatedAt:
               type: string
               format: date-time
-              nullable: true
-    CheckKycRequest:
+
+    DraftSummary:
+      type: object
+      properties:
+        draftId:
+          type: string
+        entityKey:
+          type: string
+        entityLabel:
+          type: string
+        legalName:
+          type: string
+        taxId:
+          type: string
+        status:
+          type: string
+          enum: [draft, submitted]
+        updatedAt:
+          type: string
+        retrievalUrl:
+          type: string
+
+    SubmissionSummary:
+      allOf:
+        - $ref: "#/components/schemas/DraftSummary"
+        - type: object
+          properties:
+            submissionId:
+              type: string
+            submittedAt:
+              type: string
+            overallDecision:
+              type: string
+            kycStatus:
+              type: string
+            kycSummary:
+              type: string
+            recommendedAction:
+              type: string
+
+    Entity:
+      type: object
+      required: [entity_id, legal_name, entity_type, jurisdiction, is_listed, status, created_at, updated_at]
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        legal_name:
+          type: string
+        entity_type:
+          type: string
+        jurisdiction:
+          type: string
+          minLength: 2
+          maxLength: 2
+        registration_no:
+          type: string
+          nullable: true
+        tax_id:
+          type: string
+          nullable: true
+        lei_code:
+          type: string
+          nullable: true
+        incorporation_dt:
+          type: string
+          nullable: true
+        is_listed:
+          type: boolean
+        naics_code:
+          type: string
+          nullable: true
+        risk_rating:
+          type: string
+          nullable: true
+        status:
+          type: string
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    EntityCreateRequest:
+      type: object
+      required: [legal_name, entity_type, jurisdiction]
+      properties:
+        legal_name:
+          type: string
+        entity_type:
+          type: string
+        jurisdiction:
+          type: string
+          minLength: 2
+          maxLength: 2
+        registration_no:
+          type: string
+          nullable: true
+        tax_id:
+          type: string
+          nullable: true
+        lei_code:
+          type: string
+          nullable: true
+        incorporation_dt:
+          type: string
+          nullable: true
+        is_listed:
+          type: boolean
+        naics_code:
+          type: string
+          nullable: true
+        risk_rating:
+          type: string
+          nullable: true
+        status:
+          type: string
+
+    EntityUpdateRequest:
+      type: object
+      properties:
+        legal_name:
+          type: string
+        entity_type:
+          type: string
+        jurisdiction:
+          type: string
+          minLength: 2
+          maxLength: 2
+        registration_no:
+          type: string
+          nullable: true
+        tax_id:
+          type: string
+          nullable: true
+        lei_code:
+          type: string
+          nullable: true
+        incorporation_dt:
+          type: string
+          nullable: true
+        is_listed:
+          type: boolean
+        naics_code:
+          type: string
+          nullable: true
+        risk_rating:
+          type: string
+          nullable: true
+        status:
+          type: string
+
+    Ubo:
       type: object
       required:
-        - brandName
-        - formTitle
-        - companyInfo
-        - primaryContact
-        - addresses
-        - bankingProfile
-        - beneficialOwners
-        - documents
-        - declarations
+        - ubo_id
+        - entity_id
+        - first_name
+        - last_name
+        - date_of_birth
+        - nationality
+        - country_of_residence
+        - id_type
+        - id_number
+        - ownership_pct
+        - screening_status
+        - created_at
+        - updated_at
       properties:
-        brandName:
+        ubo_id:
           type: string
-        formTitle:
+          format: uuid
+        entity_id:
           type: string
-        companyInfo:
-          $ref: '#/components/schemas/CompanyInfo'
-        primaryContact:
-          $ref: '#/components/schemas/PrimaryContact'
-        addresses:
-          $ref: '#/components/schemas/Addresses'
-        bankingProfile:
-          $ref: '#/components/schemas/BankingProfile'
-        beneficialOwners:
-          type: array
-          items:
-            $ref: '#/components/schemas/BeneficialOwner'
-        documents:
-          $ref: '#/components/schemas/Documents'
-        declarations:
-          $ref: '#/components/schemas/Declarations'
-        additionalNotes:
+          format: uuid
+        first_name:
           type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        nationality:
+          type: string
+        country_of_residence:
+          type: string
+        id_type:
+          type: string
+          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE]
+        id_number:
+          type: string
+        id_expiry_date:
+          type: string
+          nullable: true
+        id_issuing_country:
+          type: string
+          nullable: true
+        ownership_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        control_type:
+          type: string
+          nullable: true
+          enum: [DIRECT_OWNERSHIP, INDIRECT, CONTROL_BY_OTHER_MEANS]
+        is_pep:
+          type: boolean
+        is_sanctioned:
+          type: boolean
+        is_adverse_media:
+          type: boolean
+        screening_status:
+          type: string
+          enum: [PENDING, CLEAR, FLAGGED, ESCALATED]
+        last_screened_at:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    UboCreateRequest:
+      type: object
+      required:
+        - entity_id
+        - first_name
+        - last_name
+        - date_of_birth
+        - nationality
+        - country_of_residence
+        - id_type
+        - id_number
+        - ownership_pct
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        nationality:
+          type: string
+        country_of_residence:
+          type: string
+        id_type:
+          type: string
+          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE]
+        id_number:
+          type: string
+        id_expiry_date:
+          type: string
+          nullable: true
+        id_issuing_country:
+          type: string
+          nullable: true
+        ownership_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        control_type:
+          type: string
+          nullable: true
+          enum: [DIRECT_OWNERSHIP, INDIRECT, CONTROL_BY_OTHER_MEANS]
+        is_pep:
+          type: boolean
+        is_sanctioned:
+          type: boolean
+        is_adverse_media:
+          type: boolean
+        screening_status:
+          type: string
+          enum: [PENDING, CLEAR, FLAGGED, ESCALATED]
+        last_screened_at:
+          type: string
+          nullable: true
+
+    UboUpdateRequest:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        first_name:
+          type: string
+        last_name:
+          type: string
+        date_of_birth:
+          type: string
+          format: date
+        nationality:
+          type: string
+        country_of_residence:
+          type: string
+        id_type:
+          type: string
+          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE]
+        id_number:
+          type: string
+        id_expiry_date:
+          type: string
+          nullable: true
+        id_issuing_country:
+          type: string
+          nullable: true
+        ownership_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        control_type:
+          type: string
+          nullable: true
+          enum: [DIRECT_OWNERSHIP, INDIRECT, CONTROL_BY_OTHER_MEANS]
+        is_pep:
+          type: boolean
+        is_sanctioned:
+          type: boolean
+        is_adverse_media:
+          type: boolean
+        screening_status:
+          type: string
+          enum: [PENDING, CLEAR, FLAGGED, ESCALATED]
+        last_screened_at:
+          type: string
+          nullable: true
+
+    UboDocumentType:
+      type: string
+      enum: [ID_PROOF, ADDRESS_PROOF, OWNERSHIP_CERT]
+
+    UboDocumentUploadStatus:
+      type: string
+      enum: [PENDING, VERIFIED, REJECTED]
+
+    UboDocument:
+      type: object
+      required: [doc_id, ubo_id, doc_type, file_ref, upload_status, created_at]
+      properties:
+        doc_id:
+          type: string
+          format: uuid
+        ubo_id:
+          type: string
+          format: uuid
+        doc_type:
+          $ref: "#/components/schemas/UboDocumentType"
+        file_ref:
+          type: string
+          maxLength: 500
+        file_hash:
+          type: string
+          nullable: true
+          minLength: 64
+          maxLength: 64
+        upload_status:
+          $ref: "#/components/schemas/UboDocumentUploadStatus"
+        verified_by:
+          type: string
+          nullable: true
+        verified_at:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+
+    UboDocumentCreateRequest:
+      type: object
+      required: [ubo_id, doc_type, file_ref]
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        doc_type:
+          $ref: "#/components/schemas/UboDocumentType"
+        file_ref:
+          type: string
+          maxLength: 500
+        file_hash:
+          type: string
+          nullable: true
+          minLength: 64
+          maxLength: 64
+        upload_status:
+          $ref: "#/components/schemas/UboDocumentUploadStatus"
+        verified_by:
+          type: string
+          nullable: true
+        verified_at:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+
+    UboDocumentUpdateRequest:
+      type: object
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        doc_type:
+          $ref: "#/components/schemas/UboDocumentType"
+        file_ref:
+          type: string
+          maxLength: 500
+        file_hash:
+          type: string
+          nullable: true
+          minLength: 64
+          maxLength: 64
+        upload_status:
+          $ref: "#/components/schemas/UboDocumentUploadStatus"
+        verified_by:
+          type: string
+          nullable: true
+        verified_at:
+          type: string
+          nullable: true
+        expiry_date:
+          type: string
+          format: date
+          nullable: true
+
+    UboOwnershipChain:
+      type: object
+      required:
+        - chain_id
+        - ubo_id
+        - parent_entity_id
+        - child_entity_id
+        - ownership_pct
+        - chain_depth
+        - created_at
+      properties:
+        chain_id:
+          type: string
+          format: uuid
+        ubo_id:
+          type: string
+          format: uuid
+        parent_entity_id:
+          type: string
+          format: uuid
+        child_entity_id:
+          type: string
+          format: uuid
+        ownership_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        chain_depth:
+          type: integer
+          minimum: 1
+        effective_ownership:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        created_at:
+          type: string
+
+    UboOwnershipChainCreateRequest:
+      type: object
+      required: [ubo_id, parent_entity_id, child_entity_id, ownership_pct]
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        parent_entity_id:
+          type: string
+          format: uuid
+        child_entity_id:
+          type: string
+          format: uuid
+        ownership_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        chain_depth:
+          type: integer
+          minimum: 1
+          default: 1
+        effective_ownership:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+
+    UboOwnershipChainUpdateRequest:
+      type: object
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        parent_entity_id:
+          type: string
+          format: uuid
+        child_entity_id:
+          type: string
+          format: uuid
+        ownership_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        chain_depth:
+          type: integer
+          minimum: 1
+        effective_ownership:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+
+    DeleteEntityResponse:
+      type: object
+      required: [deleted, entityId, entity]
+      properties:
+        deleted:
+          type: boolean
+        entityId:
+          type: string
+        entity:
+          $ref: "#/components/schemas/Entity"
+
+    DeleteUboResponse:
+      type: object
+      required: [deleted, uboId, ubo]
+      properties:
+        deleted:
+          type: boolean
+        uboId:
+          type: string
+        ubo:
+          $ref: "#/components/schemas/Ubo"
+
+    DeleteUboDocumentResponse:
+      type: object
+      required: [deleted, docId, ubo_document]
+      properties:
+        deleted:
+          type: boolean
+        docId:
+          type: string
+        ubo_document:
+          $ref: "#/components/schemas/UboDocument"
+
+    DeleteUboOwnershipChainResponse:
+      type: object
+      required: [deleted, chainId, ownership_chain]
+      properties:
+        deleted:
+          type: boolean
+        chainId:
+          type: string
+        ownership_chain:
+          $ref: "#/components/schemas/UboOwnershipChain"
+
+    CheckKycRequest:
+      type: object
+      additionalProperties: true
+
     CheckKycContractResponse:
       type: object
       required: [status, message, checkedAt, missingFields]
@@ -677,129 +2055,62 @@ components:
           type: array
           items:
             type: string
+
     CheckKycApplicationResult:
       type: object
       required: [request, response]
       properties:
         request:
-          $ref: '#/components/schemas/CheckKycRequest'
+          $ref: "#/components/schemas/CheckKycRequest"
         response:
           type: object
-          required:
-            - response
-            - provider
-            - endpoint
-            - externalApplicationId
-            - receivedAt
-            - transmissionMode
-            - message
-            - missingFields
-            - raw
-          properties:
-            response:
-              type: string
-              enum: [Success, Failed]
-            provider:
-              type: string
-            endpoint:
-              type: string
-            externalApplicationId:
-              type: string
-            receivedAt:
-              type: string
-              format: date-time
-            transmissionMode:
-              type: string
-              enum: [local, live]
-            errorMessage:
-              type: string
-              nullable: true
-            message:
-              type: string
-            missingFields:
-              type: array
-              items:
-                type: string
-            raw:
-              type: object
-              additionalProperties: true
-    CheckRiskDocument:
+          additionalProperties: true
+
+    CheckKybRequest:
       type: object
-      required: [key, title, detail, ready]
+      required: [entityName, address, taxId]
       properties:
-        key:
+        entityName:
           type: string
-        title:
+        address:
           type: string
-        detail:
+        taxId:
           type: string
-        ready:
-          type: boolean
-    CheckRiskPayload:
+
+    CheckKybResponse:
       type: object
       required:
-        - sourceSystem
-        - submittedAt
-        - applicant
-        - primaryContact
-        - bankingProfile
-        - beneficialOwners
-        - documents
+        - status
+        - message
+        - entityName
+        - addressMatched
+        - taxIdMatched
+        - checkedAt
+        - missingFields
       properties:
-        sourceSystem:
+        status:
           type: string
-        submittedAt:
+          enum: [Pass, Fail]
+        message:
+          type: string
+        entityName:
+          type: string
+          nullable: true
+        addressMatched:
+          type: boolean
+        taxIdMatched:
+          type: boolean
+        companyStatus:
+          type: string
+          nullable: true
+        checkedAt:
           type: string
           format: date-time
-        applicant:
-          type: object
-          required:
-            - legalName
-            - entityType
-            - registrationNumber
-            - taxId
-            - incorporationCountry
-            - industry
-            - annualRevenue
-            - employeeCount
-          properties:
-            legalName:
-              type: string
-            entityType:
-              type: string
-            registrationNumber:
-              type: string
-            taxId:
-              type: string
-            incorporationCountry:
-              type: string
-            industry:
-              type: string
-            annualRevenue:
-              type: string
-            employeeCount:
-              type: string
-        primaryContact:
-          type: object
-          required: [fullName, email, phone]
-          properties:
-            fullName:
-              type: string
-            email:
-              type: string
-              format: email
-            phone:
-              type: string
-        bankingProfile:
-          $ref: '#/components/schemas/BankingProfile'
-        beneficialOwners:
+        missingFields:
           type: array
           items:
-            $ref: '#/components/schemas/BeneficialOwner'
-        documents:
-          type: array
-          items:
-            $ref: '#/components/schemas/CheckRiskDocument'
+            type: string
+
     CheckRiskResponse:
       type: object
       required: [risk]
@@ -807,3 +2118,64 @@ components:
         risk:
           type: string
           enum: [Low, Moderate, High]
+
+    PlatformSnapshot:
+      type: object
+      properties:
+        clients:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        cases:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        timeline:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        activityFeed:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        alerts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        decisionLogs:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    TableListResponse:
+      type: object
+      required: [tables]
+      properties:
+        tables:
+          type: array
+          items:
+            type: string
+
+    TableSchemaResponse:
+      type: object
+      additionalProperties: true
+
+    DatabaseInsertRequest:
+      type: object
+      required: [tableName, values]
+      properties:
+        tableName:
+          type: string
+        values:
+          type: object
+          additionalProperties: true
+
+    DatabaseInsertResponse:
+      type: object
+      additionalProperties: true

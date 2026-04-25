@@ -48,9 +48,18 @@ describe('AppShell', () => {
     );
     expect(screen.getByText('Case outlet')).toBeInTheDocument();
     expect(screen.getByText('Decision brief')).toBeInTheDocument();
-    screen
-      .getAllByRole('link', { name: /corporate account opening/i })
-      .forEach((link) => expect(link).toHaveAttribute('href', '/'));
+    const accountOpeningLinks = screen.getAllByRole('link', {
+      name: /corporate account opening/i,
+    });
+    accountOpeningLinks.forEach((link) => expect(link).toHaveAttribute('href', '/'));
+
+    const accountOpeningClick = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+    });
+    accountOpeningLinks[0].dispatchEvent(accountOpeningClick);
+    expect(accountOpeningClick.defaultPrevented).toBe(false);
+
     expect(screen.getByText(/talk to the onboarding support team/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /onboarding@harborcommercial.com/i })).toHaveAttribute(
       'href',

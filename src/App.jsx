@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   listSubmittedApplications,
   listWorkspaceDrafts,
@@ -83,6 +83,10 @@ function isReloadNavigation() {
 
   const navigationEntries = window.performance?.getEntriesByType?.("navigation");
   return navigationEntries?.[0]?.type === "reload";
+}
+
+function getBrowserPathname() {
+  return typeof window === "undefined" ? "/" : window.location.pathname;
 }
 
 function buildDraftPath(pathname, draftId) {
@@ -1368,8 +1372,7 @@ function OwnerCard({
 }
 
 function App({ forceStandaloneShell = false } = {}) {
-  const currentPathname =
-    typeof window === "undefined" ? "/" : window.location.pathname;
+  const [currentPathname, setCurrentPathname] = useState(getBrowserPathname);
   const isAdminExperience = isAdminRoute(currentPathname);
   const currentView = getCurrentView();
   const shouldResetOnRefresh =
@@ -1397,6 +1400,20 @@ function App({ forceStandaloneShell = false } = {}) {
     "Connecting to the secure application workspace...",
   );
   const saveVersionRef = useRef(0);
+
+  useEffect(() => {
+    const syncPathname = () => {
+      setCurrentPathname(getBrowserPathname());
+    };
+
+    window.addEventListener("popstate", syncPathname);
+    window.addEventListener("pageshow", syncPathname);
+
+    return () => {
+      window.removeEventListener("popstate", syncPathname);
+      window.removeEventListener("pageshow", syncPathname);
+    };
+  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -3464,8 +3481,49 @@ function App({ forceStandaloneShell = false } = {}) {
       ? " admin-shell"
       : kycFabricContext.isKycFabricExperience
         ? " kyc-fabric-shell"
-        : " customer-account-shell"
+        : " customer-account-shell corporate-light-shell"
   }`;
+  const documentRouteClass = isAdminExperience
+    ? "admin-route"
+    : kycFabricContext.isKycFabricExperience
+      ? "kyc-fabric-route"
+      : "customer-account-route";
+
+  useLayoutEffect(() => {
+    if (typeof document === "undefined") {
+      return undefined;
+    }
+
+    const html = document.documentElement;
+    const routeClasses = [
+      "admin-route",
+      "kyc-fabric-route",
+      "customer-account-route",
+    ];
+
+    document.body.classList.remove(...routeClasses);
+    document.body.classList.add(documentRouteClass);
+
+    if (documentRouteClass === "customer-account-route") {
+      html.classList.remove("dark");
+      html.classList.add("light");
+      html.dataset.theme = "light";
+      html.style.background = "#f7fbff";
+      document.body.style.background = "#f7fbff";
+      document.body.style.color = "#091a44";
+    } else {
+      html.style.background = "";
+      document.body.style.background = "";
+      document.body.style.color = "";
+    }
+
+    return () => {
+      document.body.classList.remove(documentRouteClass);
+      html.style.background = "";
+      document.body.style.background = "";
+      document.body.style.color = "";
+    };
+  }, [documentRouteClass]);
 
   return (
     <div
@@ -3568,24 +3626,6 @@ function App({ forceStandaloneShell = false } = {}) {
                         >
                           <span className="workspace-sublink-kicker">Resume</span>
                           <span className="workspace-sublink-label">Saved drafts</span>
-                        </a>
-                      </div>
-                    </div>
-                    <div className="workspace-link workspace-link-group">
-                      <div className="workspace-group-header">
-                        <span className="workspace-link-label">Admin</span>
-                        <span className="workspace-link-detail">
-                          Internal tools for database maintenance and operational support.
-                        </span>
-                      </div>
-                      <div className="workspace-submenu">
-                        <span className="workspace-submenu-label">Internal tools</span>
-                        <a
-                          className="workspace-sublink"
-                          href={adminConsoleUrl}
-                        >
-                          <span className="workspace-sublink-kicker">Manage</span>
-                          <span className="workspace-sublink-label">Database table agent</span>
                         </a>
                       </div>
                     </div>

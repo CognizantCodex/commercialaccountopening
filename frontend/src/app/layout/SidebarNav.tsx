@@ -68,8 +68,8 @@ export function SidebarNav({ compact = false }: { compact?: boolean }) {
             </NavLink>
           );
         })}
-        <NavLink
-          to={accountOpeningPath}
+        <a
+          href={accountOpeningPath}
           className={cn(
             'cognizant-nav-link group rounded-[1.5rem] border px-4 py-4 transition-all duration-200 hover:-translate-y-0.5',
             compact
@@ -92,7 +92,7 @@ export function SidebarNav({ compact = false }: { compact?: boolean }) {
               )}
             </div>
           </div>
-        </NavLink>
+        </a>
       </nav>
       {!compact && (
         <div className="mt-auto rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface-muted)] p-4">
