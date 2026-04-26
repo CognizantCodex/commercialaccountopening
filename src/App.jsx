@@ -22,6 +22,7 @@ const KYC_FABRIC_URL = "/kyc-fabric/executive";
 const KYC_FABRIC_PATH_PREFIX = "/kyc-fabric";
 const KYC_FABRIC_APPLICATION_PATH = "/kyc-fabric/application";
 const ADMIN_PATH = "/admin";
+const BROWSER_LOCATION_CHANGED_EVENT = "account-opening:locationchange";
 
 function formatRouteLabel(segment = "") {
   return segment
@@ -54,20 +55,16 @@ function isAdminRoute(pathname = "/") {
   return pathname === ADMIN_PATH || pathname.startsWith(`${ADMIN_PATH}/`);
 }
 
-function getRequestedDraftId() {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return new URLSearchParams(window.location.search).get("draft") ?? "";
+function getBrowserSearch() {
+  return typeof window === "undefined" ? "" : window.location.search;
 }
 
-function getCurrentView() {
-  if (typeof window === "undefined") {
-    return "form";
-  }
+function getRequestedDraftId(search = getBrowserSearch()) {
+  return new URLSearchParams(search).get("draft") ?? "";
+}
 
-  const requestedView = new URLSearchParams(window.location.search).get("view");
+function getCurrentView(search = getBrowserSearch()) {
+  const requestedView = new URLSearchParams(search).get("view");
 
   if (requestedView === "drafts" || requestedView === "submitted") {
     return requestedView;
@@ -89,6 +86,13 @@ function getBrowserPathname() {
   return typeof window === "undefined" ? "/" : window.location.pathname;
 }
 
+function getBrowserLocation() {
+  return {
+    pathname: getBrowserPathname(),
+    search: getBrowserSearch(),
+  };
+}
+
 function buildDraftPath(pathname, draftId) {
   if (!draftId) {
     return pathname;
@@ -105,6 +109,10 @@ function buildSubmittedApplicationsPath(pathname) {
   return `${pathname}?${new URLSearchParams({ view: "submitted" }).toString()}`;
 }
 
+function notifyBrowserLocationChanged() {
+  window.dispatchEvent(new Event(BROWSER_LOCATION_CHANGED_EVENT));
+}
+
 function syncDraftUrl(pathname, draftId) {
   if (!draftId || typeof window === "undefined") {
     return;
@@ -116,6 +124,7 @@ function syncDraftUrl(pathname, draftId) {
   nextUrl.searchParams.set("draft", draftId);
   nextUrl.hash = "";
   window.history.replaceState({}, "", nextUrl);
+  notifyBrowserLocationChanged();
 }
 
 function resetToDefaultUrl(pathname) {
@@ -128,6 +137,7 @@ function resetToDefaultUrl(pathname) {
   nextUrl.search = "";
   nextUrl.hash = "";
   window.history.replaceState({}, "", nextUrl);
+  notifyBrowserLocationChanged();
 }
 
 function createOwner(id = `owner-${Date.now()}`) {
@@ -1372,9 +1382,10 @@ function OwnerCard({
 }
 
 function App({ forceStandaloneShell = false } = {}) {
-  const [currentPathname, setCurrentPathname] = useState(getBrowserPathname);
+  const [currentLocation, setCurrentLocation] = useState(getBrowserLocation);
+  const currentPathname = currentLocation.pathname;
   const isAdminExperience = isAdminRoute(currentPathname);
-  const currentView = getCurrentView();
+  const currentView = getCurrentView(currentLocation.search);
   const shouldResetOnRefresh =
     !isAdminExperience && currentView === "form" && isReloadNavigation();
   const embeddedApplicationRoute = isEmbeddedApplicationRoute(currentPathname);
@@ -1382,7 +1393,9 @@ function App({ forceStandaloneShell = false } = {}) {
     ? { isKycFabricExperience: false, routeLabel: "Application" }
     : getKycFabricContext(currentPathname);
   const requestedDraftId =
-    shouldResetOnRefresh || isAdminExperience ? "" : getRequestedDraftId();
+    shouldResetOnRefresh || isAdminExperience
+      ? ""
+      : getRequestedDraftId(currentLocation.search);
   const shouldLoadRequestedDraft = Boolean(requestedDraftId);
   const [isMenuExpanded, setIsMenuExpanded] = useState(true);
   const [workspace, setWorkspace] = useState(defaultWorkspace);
@@ -1402,16 +1415,18 @@ function App({ forceStandaloneShell = false } = {}) {
   const saveVersionRef = useRef(0);
 
   useEffect(() => {
-    const syncPathname = () => {
-      setCurrentPathname(getBrowserPathname());
+    const syncLocation = () => {
+      setCurrentLocation(getBrowserLocation());
     };
 
-    window.addEventListener("popstate", syncPathname);
-    window.addEventListener("pageshow", syncPathname);
+    window.addEventListener("popstate", syncLocation);
+    window.addEventListener("pageshow", syncLocation);
+    window.addEventListener(BROWSER_LOCATION_CHANGED_EVENT, syncLocation);
 
     return () => {
-      window.removeEventListener("popstate", syncPathname);
-      window.removeEventListener("pageshow", syncPathname);
+      window.removeEventListener("popstate", syncLocation);
+      window.removeEventListener("pageshow", syncLocation);
+      window.removeEventListener(BROWSER_LOCATION_CHANGED_EVENT, syncLocation);
     };
   }, []);
 

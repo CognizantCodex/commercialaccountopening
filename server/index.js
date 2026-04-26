@@ -44,6 +44,13 @@ import {
   listUboOwnershipChains,
   updateUboOwnershipChain,
 } from "./uboOwnershipChainApi.js";
+import {
+  createUboScreeningResult,
+  deleteUboScreeningResult,
+  getUboScreeningResultById,
+  listUboScreeningResults,
+  updateUboScreeningResult,
+} from "./uboScreeningResultsApi.js";
 import { KycFailedError } from "./agents/kycAgent.js";
 import {
   collectSubmissionIssues,
@@ -184,6 +191,18 @@ function matchUboDocumentRoute(url) {
 
   return {
     docId: match[1] ? decodeURIComponent(match[1]) : null,
+  };
+}
+
+function matchUboScreeningResultRoute(url) {
+  const match = url.pathname.match(/^\/api(?:\/v1)?\/ubo-screening-results(?:\/([^/]+))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    resultId: match[1] ? decodeURIComponent(match[1]) : null,
   };
 }
 
@@ -372,6 +391,46 @@ async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS ubo_documents_doc_type_idx ON ubo_documents(doc_type);
     CREATE INDEX IF NOT EXISTS ubo_documents_upload_status_idx
       ON ubo_documents(upload_status);
+    CREATE TABLE IF NOT EXISTS ubo_screening_results (
+      result_id TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        '4' || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        lower(hex(randomblob(6)))
+      ),
+      ubo_id TEXT NOT NULL REFERENCES ubos(ubo_id),
+      screening_type VARCHAR(30) NOT NULL,
+      provider VARCHAR(50),
+      result_status VARCHAR(20) NOT NULL,
+      match_score NUMERIC(5,2),
+      raw_response TEXT,
+      reviewed_by TEXT,
+      reviewed_at TEXT,
+      disposition VARCHAR(30),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_ubo_screening_results_screening_type
+        CHECK (screening_type IN ('SANCTIONS', 'PEP', 'ADVERSE_MEDIA', 'WATCHLIST')),
+      CONSTRAINT chk_ubo_screening_results_status
+        CHECK (result_status IN ('CLEAR', 'HIT', 'POTENTIAL_MATCH', 'FALSE_POSITIVE')),
+      CONSTRAINT chk_ubo_screening_results_match_score
+        CHECK (match_score IS NULL OR (match_score >= 0 AND match_score <= 100)),
+      CONSTRAINT chk_ubo_screening_results_raw_response_json
+        CHECK (raw_response IS NULL OR json_valid(raw_response)),
+      CONSTRAINT chk_ubo_screening_results_disposition
+        CHECK (
+          disposition IS NULL OR
+          disposition IN ('CONFIRMED_MATCH', 'CLEARED', 'ESCALATED')
+        )
+    );
+    CREATE INDEX IF NOT EXISTS ubo_screening_results_ubo_id_idx
+      ON ubo_screening_results(ubo_id);
+    CREATE INDEX IF NOT EXISTS ubo_screening_results_screening_type_idx
+      ON ubo_screening_results(screening_type);
+    CREATE INDEX IF NOT EXISTS ubo_screening_results_status_idx
+      ON ubo_screening_results(result_status);
+    CREATE INDEX IF NOT EXISTS ubo_screening_results_disposition_idx
+      ON ubo_screening_results(disposition);
     CREATE TABLE IF NOT EXISTS ubo_ownership_chain (
       chain_id TEXT PRIMARY KEY DEFAULT (
         lower(hex(randomblob(4))) || '-' ||
@@ -1616,6 +1675,25 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const uboScreeningResultRoute = matchUboScreeningResultRoute(url);
+    if (request.method === "GET" && uboScreeningResultRoute) {
+      const responseBody = uboScreeningResultRoute.resultId
+        ? getUboScreeningResultById(db, uboScreeningResultRoute.resultId)
+        : listUboScreeningResults(db, {
+            ubo_id: url.searchParams.get("ubo_id"),
+            screening_type: url.searchParams.get("screening_type"),
+            result_status: url.searchParams.get("result_status"),
+            disposition: url.searchParams.get("disposition"),
+          });
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO screening result not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     const uboOwnershipChainRoute = matchUboOwnershipChainRoute(url);
     if (request.method === "GET" && uboOwnershipChainRoute) {
       const responseBody = uboOwnershipChainRoute.chainId
@@ -1732,6 +1810,23 @@ const server = createServer(async (request, response) => {
       request.method === "POST" &&
       matchesRoute(
         url,
+        "/api/ubo-screening-results",
+        "/api/v1/ubo-screening-results",
+      )
+    ) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = createUboScreeningResult(db, payload);
+      const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      matchesRoute(
+        url,
         "/api/ubo-ownership-chain",
         "/api/v1/ubo-ownership-chain",
       )
@@ -1811,6 +1906,25 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "PUT" && uboScreeningResultRoute?.resultId) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = updateUboScreeningResult(
+        db,
+        uboScreeningResultRoute.resultId,
+        payload,
+      );
+      const statusCode = responseBody.error === "UBO screening result not found."
+        ? 404
+        : responseBody.error
+          ? 400
+          : 200;
+      const result = json(responseBody, statusCode);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "PUT" && uboOwnershipChainRoute?.chainId) {
       const rawBody = await readRequestBody(request);
       const payload = JSON.parse(rawBody);
@@ -1857,6 +1971,20 @@ const server = createServer(async (request, response) => {
       const result = json(
         responseBody,
         responseBody.error === "UBO document not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "DELETE" && uboScreeningResultRoute?.resultId) {
+      const responseBody = deleteUboScreeningResult(
+        db,
+        uboScreeningResultRoute.resultId,
+      );
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO screening result not found." ? 404 : 200,
       );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
