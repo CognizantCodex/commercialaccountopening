@@ -31,6 +31,13 @@ import {
   updateUbo,
 } from "./uboApi.js";
 import {
+  createUboAuditLog,
+  deleteUboAuditLog,
+  getUboAuditLogById,
+  listUboAuditLogs,
+  updateUboAuditLog,
+} from "./uboAuditLogApi.js";
+import {
   createUboDocument,
   deleteUboDocument,
   getUboDocumentById,
@@ -203,6 +210,18 @@ function matchUboScreeningResultRoute(url) {
 
   return {
     resultId: match[1] ? decodeURIComponent(match[1]) : null,
+  };
+}
+
+function matchUboAuditLogRoute(url) {
+  const match = url.pathname.match(/^\/api(?:\/v1)?\/ubo-audit-log(?:\/([^/]+))?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    logId: match[1] ? decodeURIComponent(match[1]) : null,
   };
 }
 
@@ -431,6 +450,38 @@ async function initializeDatabase() {
       ON ubo_screening_results(result_status);
     CREATE INDEX IF NOT EXISTS ubo_screening_results_disposition_idx
       ON ubo_screening_results(disposition);
+    CREATE TABLE IF NOT EXISTS ubo_audit_log (
+      log_id TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' ||
+        lower(hex(randomblob(2))) || '-' ||
+        '4' || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2) || '-' ||
+        lower(hex(randomblob(6)))
+      ),
+      entity_id TEXT REFERENCES entity(entity_id),
+      ubo_id TEXT REFERENCES ubos(ubo_id),
+      action VARCHAR(50) NOT NULL,
+      performed_by TEXT NOT NULL,
+      ip_address TEXT,
+      changes TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT chk_ubo_audit_log_action
+        CHECK (action IN ('CREATED', 'UPDATED', 'SCREENED', 'APPROVED', 'REJECTED')),
+      CONSTRAINT chk_ubo_audit_log_changes_json
+        CHECK (changes IS NULL OR json_valid(changes)),
+      CONSTRAINT chk_ubo_audit_log_ip_address
+        CHECK (
+          ip_address IS NULL OR
+          instr(ip_address, '.') > 0 OR
+          instr(ip_address, ':') > 0
+        )
+    );
+    CREATE INDEX IF NOT EXISTS ubo_audit_log_entity_id_idx
+      ON ubo_audit_log(entity_id);
+    CREATE INDEX IF NOT EXISTS ubo_audit_log_ubo_id_idx
+      ON ubo_audit_log(ubo_id);
+    CREATE INDEX IF NOT EXISTS ubo_audit_log_action_idx
+      ON ubo_audit_log(action);
     CREATE TABLE IF NOT EXISTS ubo_ownership_chain (
       chain_id TEXT PRIMARY KEY DEFAULT (
         lower(hex(randomblob(4))) || '-' ||
@@ -1694,6 +1745,25 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const uboAuditLogRoute = matchUboAuditLogRoute(url);
+    if (request.method === "GET" && uboAuditLogRoute) {
+      const responseBody = uboAuditLogRoute.logId
+        ? getUboAuditLogById(db, uboAuditLogRoute.logId)
+        : listUboAuditLogs(db, {
+            entity_id: url.searchParams.get("entity_id"),
+            ubo_id: url.searchParams.get("ubo_id"),
+            action: url.searchParams.get("action"),
+            performed_by: url.searchParams.get("performed_by"),
+          });
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO audit log not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     const uboOwnershipChainRoute = matchUboOwnershipChainRoute(url);
     if (request.method === "GET" && uboOwnershipChainRoute) {
       const responseBody = uboOwnershipChainRoute.chainId
@@ -1800,6 +1870,19 @@ const server = createServer(async (request, response) => {
       const rawBody = await readRequestBody(request);
       const payload = JSON.parse(rawBody);
       const responseBody = createUboDocument(db, payload);
+      const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      matchesRoute(url, "/api/ubo-audit-log", "/api/v1/ubo-audit-log")
+    ) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = createUboAuditLog(db, payload);
       const result = json(responseBody, responseBody.error ? 400 : 201);
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
@@ -1925,6 +2008,21 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "PUT" && uboAuditLogRoute?.logId) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = updateUboAuditLog(db, uboAuditLogRoute.logId, payload);
+      const statusCode = responseBody.error === "UBO audit log not found."
+        ? 404
+        : responseBody.error
+          ? 400
+          : 200;
+      const result = json(responseBody, statusCode);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     if (request.method === "PUT" && uboOwnershipChainRoute?.chainId) {
       const rawBody = await readRequestBody(request);
       const payload = JSON.parse(rawBody);
@@ -1985,6 +2083,17 @@ const server = createServer(async (request, response) => {
       const result = json(
         responseBody,
         responseBody.error === "UBO screening result not found." ? 404 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (request.method === "DELETE" && uboAuditLogRoute?.logId) {
+      const responseBody = deleteUboAuditLog(db, uboAuditLogRoute.logId);
+      const result = json(
+        responseBody,
+        responseBody.error === "UBO audit log not found." ? 404 : 200,
       );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
