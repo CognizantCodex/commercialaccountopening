@@ -146,8 +146,22 @@ function createOwner(id = `owner-${Date.now()}`) {
     fullName: "",
     title: "",
     ownershipPercentage: "",
+    dateOfBirth: "",
+    nationality: "",
+    countryOfResidence: "",
+    residentialLine1: "",
+    residentialLine2: "",
+    residentialCity: "",
+    residentialState: "",
+    residentialPostalCode: "",
+    residentialCountry: "",
+    identificationType: "",
+    identificationNumber: "",
+    identificationIssuingCountry: "",
+    identificationExpiryDate: "",
     email: "",
     phone: "",
+    isControlPerson: false,
     isAuthorizedSigner: false,
   };
 }
@@ -393,6 +407,10 @@ function mergeWorkspace(candidate = {}) {
       candidate.titleOptions?.length
         ? candidate.titleOptions
         : defaultWorkspace.titleOptions,
+    identificationTypeOptions:
+      candidate.identificationTypeOptions?.length
+        ? candidate.identificationTypeOptions
+        : defaultWorkspace.identificationTypeOptions,
     documentOptions:
       candidate.documentOptions?.length
         ? candidate.documentOptions
@@ -799,6 +817,45 @@ function buildValidationErrors(workspace) {
         ),
       ],
       [
+        `${ownerPrefix}.dateOfBirth`,
+        getRequiredError(`${ownerLabel} date of birth`, owner.dateOfBirth),
+      ],
+      [
+        `${ownerPrefix}.nationality`,
+        getRequiredError(`${ownerLabel} nationality`, owner.nationality),
+      ],
+      [
+        `${ownerPrefix}.countryOfResidence`,
+        getRequiredError(`${ownerLabel} country of residence`, owner.countryOfResidence),
+      ],
+      [
+        `${ownerPrefix}.residentialLine1`,
+        getRequiredError(`${ownerLabel} residential address line 1`, owner.residentialLine1),
+      ],
+      [
+        `${ownerPrefix}.residentialCity`,
+        getRequiredError(`${ownerLabel} residential city`, owner.residentialCity),
+      ],
+      [
+        `${ownerPrefix}.residentialCountry`,
+        getRequiredError(`${ownerLabel} residential country`, owner.residentialCountry),
+      ],
+      [
+        `${ownerPrefix}.identificationType`,
+        getRequiredError(`${ownerLabel} identification type`, owner.identificationType),
+      ],
+      [
+        `${ownerPrefix}.identificationNumber`,
+        getRequiredError(`${ownerLabel} identification number`, owner.identificationNumber),
+      ],
+      [
+        `${ownerPrefix}.identificationIssuingCountry`,
+        getRequiredError(
+          `${ownerLabel} identification issuing country`,
+          owner.identificationIssuingCountry,
+        ),
+      ],
+      [
         `${ownerPrefix}.email`,
         getEmailError(`${ownerLabel} email`, owner.email, true),
       ],
@@ -818,6 +875,11 @@ function buildValidationErrors(workspace) {
   if (!workspace.beneficialOwners.some((owner) => owner.isAuthorizedSigner)) {
     errors["beneficialOwners.authorizedSigner"] =
       "Select at least one beneficial owner as an authorized signer.";
+  }
+
+  if (!workspace.beneficialOwners.some((owner) => owner.isControlPerson)) {
+    errors["beneficialOwners.controlPerson"] =
+      "Select at least one individual as the control person for CDD.";
   }
 
   workspace.documentOptions.forEach((document) => {
@@ -900,9 +962,19 @@ function getStepFieldKeys(stepId, workspace) {
           `beneficialOwners.${owner.id}.fullName`,
           `beneficialOwners.${owner.id}.title`,
           `beneficialOwners.${owner.id}.ownershipPercentage`,
+          `beneficialOwners.${owner.id}.dateOfBirth`,
+          `beneficialOwners.${owner.id}.nationality`,
+          `beneficialOwners.${owner.id}.countryOfResidence`,
+          `beneficialOwners.${owner.id}.residentialLine1`,
+          `beneficialOwners.${owner.id}.residentialCity`,
+          `beneficialOwners.${owner.id}.residentialCountry`,
+          `beneficialOwners.${owner.id}.identificationType`,
+          `beneficialOwners.${owner.id}.identificationNumber`,
+          `beneficialOwners.${owner.id}.identificationIssuingCountry`,
           `beneficialOwners.${owner.id}.email`,
           `beneficialOwners.${owner.id}.phone`,
         ]),
+        "beneficialOwners.controlPerson",
         "beneficialOwners.authorizedSigner",
       ];
     case "documents":
@@ -1288,8 +1360,11 @@ function OwnerCard({
   owner,
   index,
   titleOptions,
+  countryOptions,
+  identificationTypeOptions,
   onFieldChange,
   onToggleSigner,
+  onToggleControlPerson,
   onRemove,
   canRemove,
   onFieldBlur,
@@ -1367,7 +1442,144 @@ function OwnerCard({
           autoComplete="tel"
           required
         />
+        <DateField
+          label="Date of birth"
+          value={owner.dateOfBirth}
+          onChange={(event) => onFieldChange("dateOfBirth", event.target.value)}
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.dateOfBirth`)}
+          error={getFieldError(`${ownerFieldPrefix}.dateOfBirth`)}
+          required
+        />
+        <SelectField
+          label="Nationality"
+          value={owner.nationality}
+          onChange={(event) => onFieldChange("nationality", event.target.value)}
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.nationality`)}
+          error={getFieldError(`${ownerFieldPrefix}.nationality`)}
+          options={countryOptions}
+          required
+        />
+        <SelectField
+          label="Country of residence"
+          value={owner.countryOfResidence}
+          onChange={(event) =>
+            onFieldChange("countryOfResidence", event.target.value)
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.countryOfResidence`)}
+          error={getFieldError(`${ownerFieldPrefix}.countryOfResidence`)}
+          options={countryOptions}
+          required
+        />
+        <TextField
+          label="Residential address line 1"
+          value={owner.residentialLine1}
+          onChange={(event) =>
+            onFieldChange("residentialLine1", event.target.value)
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.residentialLine1`)}
+          error={getFieldError(`${ownerFieldPrefix}.residentialLine1`)}
+          autoComplete="address-line1"
+          required
+        />
+        <TextField
+          label="Residential address line 2"
+          value={owner.residentialLine2}
+          onChange={(event) =>
+            onFieldChange("residentialLine2", event.target.value)
+          }
+          autoComplete="address-line2"
+        />
+        <TextField
+          label="Residential city"
+          value={owner.residentialCity}
+          onChange={(event) =>
+            onFieldChange("residentialCity", event.target.value)
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.residentialCity`)}
+          error={getFieldError(`${ownerFieldPrefix}.residentialCity`)}
+          autoComplete="address-level2"
+          required
+        />
+        <TextField
+          label="Residential state / province"
+          value={owner.residentialState}
+          onChange={(event) =>
+            onFieldChange("residentialState", event.target.value)
+          }
+          autoComplete="address-level1"
+        />
+        <TextField
+          label="Residential postal code"
+          value={owner.residentialPostalCode}
+          onChange={(event) =>
+            onFieldChange("residentialPostalCode", event.target.value)
+          }
+          autoComplete="postal-code"
+        />
+        <SelectField
+          label="Residential country"
+          value={owner.residentialCountry}
+          onChange={(event) =>
+            onFieldChange("residentialCountry", event.target.value)
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.residentialCountry`)}
+          error={getFieldError(`${ownerFieldPrefix}.residentialCountry`)}
+          options={countryOptions}
+          required
+        />
+        <SelectField
+          label="Identification type"
+          value={owner.identificationType}
+          onChange={(event) =>
+            onFieldChange("identificationType", event.target.value)
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.identificationType`)}
+          error={getFieldError(`${ownerFieldPrefix}.identificationType`)}
+          options={identificationTypeOptions}
+          required
+        />
+        <TextField
+          label="Identification number"
+          value={owner.identificationNumber}
+          onChange={(event) =>
+            onFieldChange("identificationNumber", event.target.value)
+          }
+          onBlur={() => onFieldBlur(`${ownerFieldPrefix}.identificationNumber`)}
+          error={getFieldError(`${ownerFieldPrefix}.identificationNumber`)}
+          required
+        />
+        <SelectField
+          label="ID issuing country"
+          value={owner.identificationIssuingCountry}
+          onChange={(event) =>
+            onFieldChange("identificationIssuingCountry", event.target.value)
+          }
+          onBlur={() =>
+            onFieldBlur(`${ownerFieldPrefix}.identificationIssuingCountry`)
+          }
+          error={getFieldError(
+            `${ownerFieldPrefix}.identificationIssuingCountry`,
+          )}
+          options={countryOptions}
+          required
+        />
+        <DateField
+          label="ID expiry date"
+          value={owner.identificationExpiryDate}
+          onChange={(event) =>
+            onFieldChange("identificationExpiryDate", event.target.value)
+          }
+        />
       </div>
+
+      <label className="inline-toggle">
+        <input
+          type="checkbox"
+          checked={owner.isControlPerson}
+          onChange={onToggleControlPerson}
+        />
+        <span>This individual has significant responsibility to control or direct the business.</span>
+      </label>
 
       <label className="inline-toggle">
         <input
@@ -1751,17 +1963,38 @@ function App({ forceStandaloneShell = false } = {}) {
             isFilled(owner.fullName) &&
             isFilled(owner.title) &&
             isFilled(owner.ownershipPercentage) &&
+            isFilled(owner.dateOfBirth) &&
+            isFilled(owner.nationality) &&
+            isFilled(owner.countryOfResidence) &&
+            isFilled(owner.residentialLine1) &&
+            isFilled(owner.residentialCity) &&
+            isFilled(owner.residentialCountry) &&
+            isFilled(owner.identificationType) &&
+            isFilled(owner.identificationNumber) &&
+            isFilled(owner.identificationIssuingCountry) &&
             isFilled(owner.email) &&
             isFilled(owner.phone) &&
             !validationErrors[`beneficialOwners.${owner.id}.fullName`] &&
             !validationErrors[`beneficialOwners.${owner.id}.title`] &&
             !validationErrors[`beneficialOwners.${owner.id}.ownershipPercentage`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.dateOfBirth`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.nationality`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.countryOfResidence`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.residentialLine1`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.residentialCity`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.residentialCountry`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.identificationType`] &&
+            !validationErrors[`beneficialOwners.${owner.id}.identificationNumber`] &&
+            !validationErrors[
+              `beneficialOwners.${owner.id}.identificationIssuingCountry`
+            ] &&
             !validationErrors[`beneficialOwners.${owner.id}.email`] &&
             !validationErrors[`beneficialOwners.${owner.id}.phone`],
         ),
+        workspace.beneficialOwners.some((owner) => owner.isControlPerson),
         workspace.beneficialOwners.some((owner) => owner.isAuthorizedSigner),
       ].filter(Boolean).length,
-      total: 2,
+      total: 3,
     },
     documents: {
       complete: [
@@ -1848,17 +2081,31 @@ function App({ forceStandaloneShell = false } = {}) {
       (owner) =>
         isFilled(owner.fullName) &&
         isFilled(owner.title) &&
-        isFilled(owner.ownershipPercentage),
+        isFilled(owner.ownershipPercentage) &&
+        isFilled(owner.dateOfBirth) &&
+        isFilled(owner.residentialLine1) &&
+        isFilled(owner.residentialCity) &&
+        isFilled(owner.residentialCountry) &&
+        isFilled(owner.identificationType) &&
+        isFilled(owner.identificationNumber),
     )
   ) {
-    missingItems.push("Add at least one beneficial owner or control person.");
+    missingItems.push("Add complete CDD details for at least one beneficial owner or control person.");
+  }
+  if (validationErrors["beneficialOwners.controlPerson"]) {
+    missingItems.push(validationErrors["beneficialOwners.controlPerson"]);
   }
   if (validationErrors["beneficialOwners.authorizedSigner"]) {
     missingItems.push(validationErrors["beneficialOwners.authorizedSigner"]);
   }
   const ownerContractErrors = Object.entries(validationErrors)
     .filter(([fieldKey]) =>
-      fieldKey.includes(".email") || fieldKey.includes(".phone"),
+      fieldKey.startsWith("beneficialOwners.") &&
+      (fieldKey.includes(".email") ||
+        fieldKey.includes(".phone") ||
+        fieldKey.includes(".dateOfBirth") ||
+        fieldKey.includes(".residential") ||
+        fieldKey.includes(".identification")),
     )
     .map(([, message]) => message);
   missingItems.push(...ownerContractErrors);
@@ -2978,6 +3225,11 @@ function App({ forceStandaloneShell = false } = {}) {
               {getFieldError("beneficialOwners.authorizedSigner")}
             </p>
           ) : null}
+          {getFieldError("beneficialOwners.controlPerson") ? (
+            <p className="group-error-copy">
+              {getFieldError("beneficialOwners.controlPerson")}
+            </p>
+          ) : null}
 
           <div className="owner-stack">
             {workspace.beneficialOwners.map((owner, index) => (
@@ -2986,10 +3238,15 @@ function App({ forceStandaloneShell = false } = {}) {
                 owner={owner}
                 index={index}
                 titleOptions={workspace.titleOptions}
+                countryOptions={workspace.countryOptions}
+                identificationTypeOptions={workspace.identificationTypeOptions}
                 canRemove={workspace.beneficialOwners.length > 1}
                 onFieldChange={(field, value) => updateOwner(owner.id, field, value)}
                 onFieldBlur={handleFieldBlur}
                 getFieldError={getFieldError}
+                onToggleControlPerson={(event) =>
+                  updateOwner(owner.id, "isControlPerson", event.target.checked)
+                }
                 onToggleSigner={(event) =>
                   updateOwner(owner.id, "isAuthorizedSigner", event.target.checked)
                 }

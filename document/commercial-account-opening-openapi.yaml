@@ -5,8 +5,9 @@ info:
   description: >
     Swagger/OpenAPI contract for the Node.js API that supports the commercial
     account opening workspace, local screening integrations, direct database
-    table helpers, and CRUD APIs for entities, UBOs, UBO documents, and UBO
-    ownership chains.
+    table helpers, and CRUD APIs for entities, UBOs, UBO documents, UBO
+    screening results, UBO audit logs, ownership chains, and FinCEN CDD
+    assessments.
 servers:
   - url: http://localhost:8080
     description: Local Node API
@@ -17,7 +18,10 @@ tags:
   - name: Entities
   - name: UBOs
   - name: UBO Documents
+  - name: UBO Screening Results
+  - name: UBO Audit Log
   - name: UBO Ownership Chains
+  - name: FinCEN CDD
   - name: Screening
   - name: Platform
   - name: Database Agents
@@ -398,6 +402,90 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteEntityResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/fincen-cdd/entities/{entityId}/assessment:
+    get:
+      tags: [FinCEN CDD]
+      summary: Assess FinCEN CDD readiness for a legal entity
+      operationId: getFincenCddAssessment
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      responses:
+        "200":
+          description: FinCEN CDD assessment result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FincenCddAssessmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/fincen-cdd/entities/{entityId}/assessment:
+    get:
+      tags: [FinCEN CDD]
+      summary: Assess FinCEN CDD readiness for a legal entity using the v1 alias
+      operationId: getFincenCddAssessmentV1
+      parameters:
+        - $ref: "#/components/parameters/entityId"
+      responses:
+        "200":
+          description: FinCEN CDD assessment result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FincenCddAssessmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/fincen-cdd/assessments:
+    post:
+      tags: [FinCEN CDD]
+      summary: Assess FinCEN CDD readiness from a request body
+      operationId: createFincenCddAssessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FincenCddAssessmentRequest"
+      responses:
+        "200":
+          description: FinCEN CDD assessment result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FincenCddAssessmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/fincen-cdd/assessments:
+    post:
+      tags: [FinCEN CDD]
+      summary: Assess FinCEN CDD readiness from a request body using the v1 alias
+      operationId: createFincenCddAssessmentV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FincenCddAssessmentRequest"
+      responses:
+        "200":
+          description: FinCEN CDD assessment result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FincenCddAssessmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -858,6 +946,500 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteUboDocumentResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/ubo-screening-results:
+    get:
+      tags: [UBO Screening Results]
+      summary: List UBO screening results
+      operationId: listUboScreeningResults
+      parameters:
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: screening_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboScreeningType"
+        - name: result_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboScreeningResultStatus"
+        - name: disposition
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboScreeningDisposition"
+      responses:
+        "200":
+          description: UBO screening-result list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_results]
+                properties:
+                  ubo_screening_results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboScreeningResult"
+    post:
+      tags: [UBO Screening Results]
+      summary: Create a UBO screening result
+      operationId: createUboScreeningResult
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboScreeningResultCreateRequest"
+      responses:
+        "201":
+          description: UBO screening result created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_result]
+                properties:
+                  ubo_screening_result:
+                    $ref: "#/components/schemas/UboScreeningResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/ubo-screening-results/{resultId}:
+    get:
+      tags: [UBO Screening Results]
+      summary: Read a UBO screening result
+      operationId: getUboScreeningResultById
+      parameters:
+        - $ref: "#/components/parameters/resultId"
+      responses:
+        "200":
+          description: UBO screening result record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_result]
+                properties:
+                  ubo_screening_result:
+                    $ref: "#/components/schemas/UboScreeningResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Screening Results]
+      summary: Update a UBO screening result
+      operationId: updateUboScreeningResult
+      parameters:
+        - $ref: "#/components/parameters/resultId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboScreeningResultUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO screening result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_result]
+                properties:
+                  ubo_screening_result:
+                    $ref: "#/components/schemas/UboScreeningResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Screening Results]
+      summary: Delete a UBO screening result
+      operationId: deleteUboScreeningResult
+      parameters:
+        - $ref: "#/components/parameters/resultId"
+      responses:
+        "200":
+          description: Deleted UBO screening result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboScreeningResultResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ubo-screening-results:
+    get:
+      tags: [UBO Screening Results]
+      summary: List UBO screening results using the v1 alias
+      operationId: listUboScreeningResultsV1
+      parameters:
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: screening_type
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboScreeningType"
+        - name: result_status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboScreeningResultStatus"
+        - name: disposition
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboScreeningDisposition"
+      responses:
+        "200":
+          description: UBO screening-result list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_results]
+                properties:
+                  ubo_screening_results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboScreeningResult"
+    post:
+      tags: [UBO Screening Results]
+      summary: Create a UBO screening result using the v1 alias
+      operationId: createUboScreeningResultV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboScreeningResultCreateRequest"
+      responses:
+        "201":
+          description: UBO screening result created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_result]
+                properties:
+                  ubo_screening_result:
+                    $ref: "#/components/schemas/UboScreeningResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/ubo-screening-results/{resultId}:
+    get:
+      tags: [UBO Screening Results]
+      summary: Read a UBO screening result using the v1 alias
+      operationId: getUboScreeningResultByIdV1
+      parameters:
+        - $ref: "#/components/parameters/resultId"
+      responses:
+        "200":
+          description: UBO screening result record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_result]
+                properties:
+                  ubo_screening_result:
+                    $ref: "#/components/schemas/UboScreeningResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Screening Results]
+      summary: Update a UBO screening result using the v1 alias
+      operationId: updateUboScreeningResultV1
+      parameters:
+        - $ref: "#/components/parameters/resultId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboScreeningResultUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO screening result.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_screening_result]
+                properties:
+                  ubo_screening_result:
+                    $ref: "#/components/schemas/UboScreeningResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Screening Results]
+      summary: Delete a UBO screening result using the v1 alias
+      operationId: deleteUboScreeningResultV1
+      parameters:
+        - $ref: "#/components/parameters/resultId"
+      responses:
+        "200":
+          description: Deleted UBO screening result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboScreeningResultResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/ubo-audit-log:
+    get:
+      tags: [UBO Audit Log]
+      summary: List UBO audit-log records
+      operationId: listUboAuditLogs
+      parameters:
+        - name: entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboAuditAction"
+        - name: performed_by
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: UBO audit-log list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_logs]
+                properties:
+                  ubo_audit_logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboAuditLog"
+    post:
+      tags: [UBO Audit Log]
+      summary: Create a UBO audit-log record
+      operationId: createUboAuditLog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboAuditLogCreateRequest"
+      responses:
+        "201":
+          description: UBO audit-log record created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_log]
+                properties:
+                  ubo_audit_log:
+                    $ref: "#/components/schemas/UboAuditLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/ubo-audit-log/{logId}:
+    get:
+      tags: [UBO Audit Log]
+      summary: Read a UBO audit-log record
+      operationId: getUboAuditLogById
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      responses:
+        "200":
+          description: UBO audit-log record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_log]
+                properties:
+                  ubo_audit_log:
+                    $ref: "#/components/schemas/UboAuditLog"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Audit Log]
+      summary: Update a UBO audit-log record
+      operationId: updateUboAuditLog
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboAuditLogUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO audit-log record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_log]
+                properties:
+                  ubo_audit_log:
+                    $ref: "#/components/schemas/UboAuditLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Audit Log]
+      summary: Delete a UBO audit-log record
+      operationId: deleteUboAuditLog
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      responses:
+        "200":
+          description: Deleted UBO audit-log record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboAuditLogResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/ubo-audit-log:
+    get:
+      tags: [UBO Audit Log]
+      summary: List UBO audit-log records using the v1 alias
+      operationId: listUboAuditLogsV1
+      parameters:
+        - name: entity_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: ubo_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            $ref: "#/components/schemas/UboAuditAction"
+        - name: performed_by
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: UBO audit-log list.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_logs]
+                properties:
+                  ubo_audit_logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UboAuditLog"
+    post:
+      tags: [UBO Audit Log]
+      summary: Create a UBO audit-log record using the v1 alias
+      operationId: createUboAuditLogV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboAuditLogCreateRequest"
+      responses:
+        "201":
+          description: UBO audit-log record created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_log]
+                properties:
+                  ubo_audit_log:
+                    $ref: "#/components/schemas/UboAuditLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/ubo-audit-log/{logId}:
+    get:
+      tags: [UBO Audit Log]
+      summary: Read a UBO audit-log record using the v1 alias
+      operationId: getUboAuditLogByIdV1
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      responses:
+        "200":
+          description: UBO audit-log record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_log]
+                properties:
+                  ubo_audit_log:
+                    $ref: "#/components/schemas/UboAuditLog"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      tags: [UBO Audit Log]
+      summary: Update a UBO audit-log record using the v1 alias
+      operationId: updateUboAuditLogV1
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UboAuditLogUpdateRequest"
+      responses:
+        "200":
+          description: Updated UBO audit-log record.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ubo_audit_log]
+                properties:
+                  ubo_audit_log:
+                    $ref: "#/components/schemas/UboAuditLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [UBO Audit Log]
+      summary: Delete a UBO audit-log record using the v1 alias
+      operationId: deleteUboAuditLogV1
+      parameters:
+        - $ref: "#/components/parameters/logId"
+      responses:
+        "200":
+          description: Deleted UBO audit-log record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUboAuditLogResponse"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -1394,6 +1976,20 @@ components:
       schema:
         type: string
         format: uuid
+    resultId:
+      name: resultId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    logId:
+      name: logId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     chainId:
       name: chainId
       in: path
@@ -1542,6 +2138,8 @@ components:
         naics_code:
           type: string
           nullable: true
+          pattern: '^\d{2,6}$'
+          description: NAICS code used by the FinCEN CDD risk-profile assessment.
         risk_rating:
           type: string
           nullable: true
@@ -1555,6 +2153,9 @@ components:
     EntityCreateRequest:
       type: object
       required: [legal_name, entity_type, jurisdiction]
+      description: >
+        Either naics_code must be supplied directly or industry must match a
+        supported industry that can be mapped to a NAICS code.
       properties:
         legal_name:
           type: string
@@ -1578,9 +2179,14 @@ components:
           nullable: true
         is_listed:
           type: boolean
+        industry:
+          type: string
+          nullable: true
+          description: Supported primary-industry label used to derive naics_code.
         naics_code:
           type: string
           nullable: true
+          pattern: '^\d{2,6}$'
         risk_rating:
           type: string
           nullable: true
@@ -1589,6 +2195,9 @@ components:
 
     EntityUpdateRequest:
       type: object
+      description: >
+        Updating industry or naics_code refreshes the stored naics_code used by
+        the FinCEN CDD assessment.
       properties:
         legal_name:
           type: string
@@ -1612,9 +2221,14 @@ components:
           nullable: true
         is_listed:
           type: boolean
+        industry:
+          type: string
+          nullable: true
+          description: Supported primary-industry label used to derive naics_code.
         naics_code:
           type: string
           nullable: true
+          pattern: '^\d{2,6}$'
         risk_rating:
           type: string
           nullable: true
@@ -1634,6 +2248,8 @@ components:
         - id_type
         - id_number
         - ownership_pct
+        - is_control_person
+        - cdd_verification_status
         - screening_status
         - created_at
         - updated_at
@@ -1657,13 +2273,31 @@ components:
           type: string
         id_type:
           type: string
-          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE]
+          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE, OTHER_GOVERNMENT_ID]
         id_number:
           type: string
         id_expiry_date:
           type: string
           nullable: true
         id_issuing_country:
+          type: string
+          nullable: true
+        residential_address_line1:
+          type: string
+          nullable: true
+        residential_address_line2:
+          type: string
+          nullable: true
+        residential_city:
+          type: string
+          nullable: true
+        residential_state:
+          type: string
+          nullable: true
+        residential_postal_code:
+          type: string
+          nullable: true
+        residential_country:
           type: string
           nullable: true
         ownership_pct:
@@ -1674,6 +2308,28 @@ components:
           type: string
           nullable: true
           enum: [DIRECT_OWNERSHIP, INDIRECT, CONTROL_BY_OTHER_MEANS]
+        control_title:
+          type: string
+          nullable: true
+        is_control_person:
+          type: boolean
+        cdd_verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, FAILED, EXEMPT]
+        cdd_verification_method:
+          type: string
+          nullable: true
+          enum: [DOCUMENTARY, NON_DOCUMENTARY, BOTH, RELIANCE]
+        cdd_verified_at:
+          type: string
+          nullable: true
+        cdd_certification_date:
+          type: string
+          format: date
+          nullable: true
+        cdd_certified_by:
+          type: string
+          nullable: true
         is_pep:
           type: boolean
         is_sanctioned:
@@ -1720,13 +2376,31 @@ components:
           type: string
         id_type:
           type: string
-          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE]
+          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE, OTHER_GOVERNMENT_ID]
         id_number:
           type: string
         id_expiry_date:
           type: string
           nullable: true
         id_issuing_country:
+          type: string
+          nullable: true
+        residential_address_line1:
+          type: string
+          nullable: true
+        residential_address_line2:
+          type: string
+          nullable: true
+        residential_city:
+          type: string
+          nullable: true
+        residential_state:
+          type: string
+          nullable: true
+        residential_postal_code:
+          type: string
+          nullable: true
+        residential_country:
           type: string
           nullable: true
         ownership_pct:
@@ -1737,6 +2411,28 @@ components:
           type: string
           nullable: true
           enum: [DIRECT_OWNERSHIP, INDIRECT, CONTROL_BY_OTHER_MEANS]
+        control_title:
+          type: string
+          nullable: true
+        is_control_person:
+          type: boolean
+        cdd_verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, FAILED, EXEMPT]
+        cdd_verification_method:
+          type: string
+          nullable: true
+          enum: [DOCUMENTARY, NON_DOCUMENTARY, BOTH, RELIANCE]
+        cdd_verified_at:
+          type: string
+          nullable: true
+        cdd_certification_date:
+          type: string
+          format: date
+          nullable: true
+        cdd_certified_by:
+          type: string
+          nullable: true
         is_pep:
           type: boolean
         is_sanctioned:
@@ -1769,13 +2465,31 @@ components:
           type: string
         id_type:
           type: string
-          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE]
+          enum: [PASSPORT, NATIONAL_ID, DRIVERS_LICENSE, OTHER_GOVERNMENT_ID]
         id_number:
           type: string
         id_expiry_date:
           type: string
           nullable: true
         id_issuing_country:
+          type: string
+          nullable: true
+        residential_address_line1:
+          type: string
+          nullable: true
+        residential_address_line2:
+          type: string
+          nullable: true
+        residential_city:
+          type: string
+          nullable: true
+        residential_state:
+          type: string
+          nullable: true
+        residential_postal_code:
+          type: string
+          nullable: true
+        residential_country:
           type: string
           nullable: true
         ownership_pct:
@@ -1786,6 +2500,28 @@ components:
           type: string
           nullable: true
           enum: [DIRECT_OWNERSHIP, INDIRECT, CONTROL_BY_OTHER_MEANS]
+        control_title:
+          type: string
+          nullable: true
+        is_control_person:
+          type: boolean
+        cdd_verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, FAILED, EXEMPT]
+        cdd_verification_method:
+          type: string
+          nullable: true
+          enum: [DOCUMENTARY, NON_DOCUMENTARY, BOTH, RELIANCE]
+        cdd_verified_at:
+          type: string
+          nullable: true
+        cdd_certification_date:
+          type: string
+          format: date
+          nullable: true
+        cdd_certified_by:
+          type: string
+          nullable: true
         is_pep:
           type: boolean
         is_sanctioned:
@@ -1900,6 +2636,207 @@ components:
           type: string
           format: date
           nullable: true
+
+    UboScreeningType:
+      type: string
+      enum: [SANCTIONS, PEP, ADVERSE_MEDIA, WATCHLIST]
+
+    UboScreeningResultStatus:
+      type: string
+      enum: [CLEAR, HIT, POTENTIAL_MATCH, FALSE_POSITIVE]
+
+    UboScreeningDisposition:
+      type: string
+      enum: [CONFIRMED_MATCH, CLEARED, ESCALATED]
+
+    UboScreeningResult:
+      type: object
+      required: [result_id, ubo_id, screening_type, result_status, created_at]
+      properties:
+        result_id:
+          type: string
+          format: uuid
+        ubo_id:
+          type: string
+          format: uuid
+        screening_type:
+          $ref: "#/components/schemas/UboScreeningType"
+        provider:
+          type: string
+          nullable: true
+          maxLength: 50
+        result_status:
+          $ref: "#/components/schemas/UboScreeningResultStatus"
+        match_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+        raw_response:
+          type: object
+          nullable: true
+          additionalProperties: true
+        reviewed_by:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          nullable: true
+        disposition:
+          allOf:
+            - $ref: "#/components/schemas/UboScreeningDisposition"
+          nullable: true
+        created_at:
+          type: string
+
+    UboScreeningResultCreateRequest:
+      type: object
+      required: [ubo_id, screening_type, result_status]
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        screening_type:
+          $ref: "#/components/schemas/UboScreeningType"
+        provider:
+          type: string
+          nullable: true
+          maxLength: 50
+        result_status:
+          $ref: "#/components/schemas/UboScreeningResultStatus"
+        match_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+        raw_response:
+          type: object
+          nullable: true
+          additionalProperties: true
+        reviewed_by:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          nullable: true
+        disposition:
+          allOf:
+            - $ref: "#/components/schemas/UboScreeningDisposition"
+          nullable: true
+
+    UboScreeningResultUpdateRequest:
+      type: object
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        screening_type:
+          $ref: "#/components/schemas/UboScreeningType"
+        provider:
+          type: string
+          nullable: true
+          maxLength: 50
+        result_status:
+          $ref: "#/components/schemas/UboScreeningResultStatus"
+        match_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+        raw_response:
+          type: object
+          nullable: true
+          additionalProperties: true
+        reviewed_by:
+          type: string
+          nullable: true
+        reviewed_at:
+          type: string
+          nullable: true
+        disposition:
+          allOf:
+            - $ref: "#/components/schemas/UboScreeningDisposition"
+          nullable: true
+
+    UboAuditAction:
+      type: string
+      enum: [CREATED, UPDATED, SCREENED, APPROVED, REJECTED]
+
+    UboAuditLog:
+      type: object
+      required: [log_id, action, performed_by, created_at]
+      properties:
+        log_id:
+          type: string
+          format: uuid
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        ubo_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          $ref: "#/components/schemas/UboAuditAction"
+        performed_by:
+          type: string
+        ip_address:
+          type: string
+          nullable: true
+        changes:
+          type: object
+          nullable: true
+          additionalProperties: true
+        created_at:
+          type: string
+
+    UboAuditLogCreateRequest:
+      type: object
+      required: [action, performed_by]
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        ubo_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          $ref: "#/components/schemas/UboAuditAction"
+        performed_by:
+          type: string
+        ip_address:
+          type: string
+          nullable: true
+        changes:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    UboAuditLogUpdateRequest:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        ubo_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          $ref: "#/components/schemas/UboAuditAction"
+        performed_by:
+          type: string
+        ip_address:
+          type: string
+          nullable: true
+        changes:
+          type: object
+          nullable: true
+          additionalProperties: true
 
     UboOwnershipChain:
       type: object
@@ -2024,6 +2961,28 @@ components:
         ubo_document:
           $ref: "#/components/schemas/UboDocument"
 
+    DeleteUboScreeningResultResponse:
+      type: object
+      required: [deleted, resultId, ubo_screening_result]
+      properties:
+        deleted:
+          type: boolean
+        resultId:
+          type: string
+        ubo_screening_result:
+          $ref: "#/components/schemas/UboScreeningResult"
+
+    DeleteUboAuditLogResponse:
+      type: object
+      required: [deleted, logId, ubo_audit_log]
+      properties:
+        deleted:
+          type: boolean
+        logId:
+          type: string
+        ubo_audit_log:
+          $ref: "#/components/schemas/UboAuditLog"
+
     DeleteUboOwnershipChainResponse:
       type: object
       required: [deleted, chainId, ownership_chain]
@@ -2034,6 +2993,127 @@ components:
           type: string
         ownership_chain:
           $ref: "#/components/schemas/UboOwnershipChain"
+
+    FincenCddAssessmentRequest:
+      type: object
+      required: [entity_id]
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+
+    FincenCddSection:
+      type: object
+      required: [status, missing_items]
+      properties:
+        status:
+          type: string
+          enum: [COMPLETE, INCOMPLETE]
+        missing_items:
+          type: array
+          items:
+            type: string
+
+    FincenCddUboFinding:
+      type: object
+      required: [ubo_id, name, ownership_pct, prongs, missing_items, verification_status]
+      properties:
+        ubo_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        ownership_pct:
+          type: number
+        prongs:
+          type: array
+          items:
+            type: string
+            enum: [OWNERSHIP, CONTROL]
+        missing_items:
+          type: array
+          items:
+            type: string
+        verification_status:
+          type: string
+          enum: [PENDING, VERIFIED, FAILED, EXEMPT]
+
+    FincenCddAssessment:
+      type: object
+      required:
+        - rule
+        - entity
+        - customer_identification
+        - beneficial_ownership
+        - customer_risk_profile
+        - ongoing_monitoring
+        - cdd_ready
+        - missing_items
+      properties:
+        rule:
+          type: object
+          additionalProperties: true
+        entity:
+          type: object
+          required: [entity_id, legal_name, entity_type, jurisdiction]
+          properties:
+            entity_id:
+              type: string
+              format: uuid
+            legal_name:
+              type: string
+            entity_type:
+              type: string
+            jurisdiction:
+              type: string
+            registration_no:
+              type: string
+              nullable: true
+            tax_id:
+              type: string
+              nullable: true
+            naics_code:
+              type: string
+              nullable: true
+            risk_rating:
+              type: string
+              nullable: true
+        customer_identification:
+          $ref: "#/components/schemas/FincenCddSection"
+        beneficial_ownership:
+          allOf:
+            - $ref: "#/components/schemas/FincenCddSection"
+            - type: object
+              properties:
+                ownership_prong_ubos:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Ubo"
+                control_prong_ubos:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Ubo"
+                ubo_findings:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/FincenCddUboFinding"
+        customer_risk_profile:
+          $ref: "#/components/schemas/FincenCddSection"
+        ongoing_monitoring:
+          $ref: "#/components/schemas/FincenCddSection"
+        cdd_ready:
+          type: boolean
+        missing_items:
+          type: array
+          items:
+            type: string
+
+    FincenCddAssessmentResponse:
+      type: object
+      required: [fincen_cdd_assessment]
+      properties:
+        fincen_cdd_assessment:
+          $ref: "#/components/schemas/FincenCddAssessment"
 
     CheckKycRequest:
       type: object

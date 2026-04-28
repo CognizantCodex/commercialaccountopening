@@ -17,6 +17,11 @@ import {
   runDatabaseInsertAgent,
 } from "./agents/databaseInsertAgent.js";
 import {
+  buildFincenCddAssessment,
+  buildFincenCddAssessmentFromPayload,
+} from "./fincenCddApi.js";
+import { resolveNaicsCode } from "./naics.js";
+import {
   createEntity,
   deleteEntity,
   getEntityById,
@@ -225,6 +230,20 @@ function matchUboAuditLogRoute(url) {
   };
 }
 
+function matchFincenCddAssessmentRoute(url) {
+  const match = url.pathname.match(
+    /^\/api(?:\/v1)?\/fincen-cdd\/entities\/([^/]+)\/assessment$/,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    entityId: decodeURIComponent(match[1]),
+  };
+}
+
 function matchUboOwnershipChainRoute(url) {
   const match = url.pathname.match(/^\/api(?:\/v1)?\/ubo-ownership-chain(?:\/([^/]+))?$/);
 
@@ -346,8 +365,21 @@ async function initializeDatabase() {
       id_number TEXT NOT NULL,
       id_expiry_date TEXT,
       id_issuing_country TEXT,
+      residential_address_line1 TEXT,
+      residential_address_line2 TEXT,
+      residential_city TEXT,
+      residential_state TEXT,
+      residential_postal_code TEXT,
+      residential_country TEXT,
       ownership_pct NUMERIC NOT NULL,
       control_type TEXT,
+      control_title TEXT,
+      is_control_person INTEGER NOT NULL DEFAULT 0,
+      cdd_verification_status TEXT NOT NULL DEFAULT 'PENDING',
+      cdd_verification_method TEXT,
+      cdd_verified_at TEXT,
+      cdd_certification_date TEXT,
+      cdd_certified_by TEXT,
       is_pep INTEGER NOT NULL DEFAULT 0,
       is_sanctioned INTEGER NOT NULL DEFAULT 0,
       is_adverse_media INTEGER NOT NULL DEFAULT 0,
@@ -363,12 +395,23 @@ async function initializeDatabase() {
         CHECK (length(trim(country_of_residence)) = 2),
       CONSTRAINT chk_ubos_id_issuing_country
         CHECK (id_issuing_country IS NULL OR length(trim(id_issuing_country)) = 2),
+      CONSTRAINT chk_ubos_residential_country
+        CHECK (residential_country IS NULL OR length(trim(residential_country)) = 2),
       CONSTRAINT chk_ubos_id_type
-        CHECK (id_type IN ('PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE')),
+        CHECK (id_type IN ('PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE', 'OTHER_GOVERNMENT_ID')),
       CONSTRAINT chk_ubos_control_type
         CHECK (
           control_type IS NULL OR
           control_type IN ('DIRECT_OWNERSHIP', 'INDIRECT', 'CONTROL_BY_OTHER_MEANS')
+        ),
+      CONSTRAINT chk_ubos_is_control_person
+        CHECK (is_control_person IN (0, 1)),
+      CONSTRAINT chk_ubos_cdd_verification_status
+        CHECK (cdd_verification_status IN ('PENDING', 'VERIFIED', 'FAILED', 'EXEMPT')),
+      CONSTRAINT chk_ubos_cdd_verification_method
+        CHECK (
+          cdd_verification_method IS NULL OR
+          cdd_verification_method IN ('DOCUMENTARY', 'NON_DOCUMENTARY', 'BOTH', 'RELIANCE')
         ),
       CONSTRAINT chk_ubos_screening_status
         CHECK (screening_status IN ('PENDING', 'CLEAR', 'FLAGGED', 'ESCALATED')),
@@ -518,6 +561,32 @@ async function initializeDatabase() {
   if (!workspaceDraftColumns.some((column) => column.name === "entity_key")) {
     database.exec("ALTER TABLE workspace_drafts ADD COLUMN entity_key TEXT");
   }
+
+  const uboColumns = database.prepare("PRAGMA table_info(ubos)").all();
+  const hasUboColumn = (columnName) =>
+    uboColumns.some((column) => column.name === columnName);
+  const addUboColumn = (columnName, definition) => {
+    if (!hasUboColumn(columnName)) {
+      database.exec(`ALTER TABLE ubos ADD COLUMN ${definition}`);
+    }
+  };
+
+  addUboColumn("residential_address_line1", "residential_address_line1 TEXT");
+  addUboColumn("residential_address_line2", "residential_address_line2 TEXT");
+  addUboColumn("residential_city", "residential_city TEXT");
+  addUboColumn("residential_state", "residential_state TEXT");
+  addUboColumn("residential_postal_code", "residential_postal_code TEXT");
+  addUboColumn("residential_country", "residential_country TEXT");
+  addUboColumn("control_title", "control_title TEXT");
+  addUboColumn("is_control_person", "is_control_person INTEGER NOT NULL DEFAULT 0");
+  addUboColumn(
+    "cdd_verification_status",
+    "cdd_verification_status TEXT NOT NULL DEFAULT 'PENDING'",
+  );
+  addUboColumn("cdd_verification_method", "cdd_verification_method TEXT");
+  addUboColumn("cdd_verified_at", "cdd_verified_at TEXT");
+  addUboColumn("cdd_certification_date", "cdd_certification_date TEXT");
+  addUboColumn("cdd_certified_by", "cdd_certified_by TEXT");
 
   database.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS workspace_drafts_entity_key_unique
@@ -738,6 +807,77 @@ function recordSubmission(submissionId, workspace, orchestrationResult) {
   );
 }
 
+function buildSubmittedEntityPayload(workspace, orchestrationResult) {
+  const companyInfo = workspace.companyInfo ?? {};
+  const riskScore = orchestrationResult.orchestration?.checks?.risk?.score;
+
+  return {
+    legal_name: companyInfo.legalName,
+    entity_type: companyInfo.entityType,
+    jurisdiction: toIsoCountryCode(
+      companyInfo.incorporationCountry || workspace.addresses?.country,
+    ),
+    registration_no: companyInfo.registrationNumber,
+    tax_id: companyInfo.taxId,
+    incorporation_dt: companyInfo.incorporationDate,
+    industry: companyInfo.industry,
+    naics_code: resolveNaicsCode({ industry: companyInfo.industry }),
+    risk_rating: mapRiskScoreToRating(riskScore),
+    status: "PENDING",
+  };
+}
+
+function findExistingEntityId(entityPayload) {
+  if (hasText(entityPayload.tax_id)) {
+    const row = db
+      .prepare("SELECT entity_id FROM entity WHERE tax_id = ?")
+      .get(String(entityPayload.tax_id).trim());
+
+    if (row?.entity_id) {
+      return row.entity_id;
+    }
+  }
+
+  if (hasText(entityPayload.registration_no)) {
+    const row = db
+      .prepare("SELECT entity_id FROM entity WHERE registration_no = ?")
+      .get(String(entityPayload.registration_no).trim());
+
+    if (row?.entity_id) {
+      return row.entity_id;
+    }
+  }
+
+  if (hasText(entityPayload.legal_name)) {
+    const row = db
+      .prepare("SELECT entity_id FROM entity WHERE lower(legal_name) = lower(?)")
+      .get(String(entityPayload.legal_name).trim());
+
+    if (row?.entity_id) {
+      return row.entity_id;
+    }
+  }
+
+  return "";
+}
+
+function persistSubmittedEntity(workspace, orchestrationResult) {
+  const entityPayload = buildSubmittedEntityPayload(workspace, orchestrationResult);
+  const existingEntityId = findExistingEntityId(entityPayload);
+  const result = existingEntityId
+    ? updateEntity(db, existingEntityId, entityPayload)
+    : createEntity(db, entityPayload);
+
+  if (result.error) {
+    throw new ValidationError(
+      "The legal entity could not be created or updated for CDD review.",
+      result.issues ?? [result.error],
+    );
+  }
+
+  return result.entity;
+}
+
 async function submitWorkspace(workspace, requestedDraftId = "") {
   const issues = collectSubmissionIssues(workspace);
 
@@ -757,6 +897,8 @@ async function submitWorkspace(workspace, requestedDraftId = "") {
     },
     requestedDraftId,
   );
+
+  persistSubmittedEntity(nextWorkspace, orchestrationResult);
 
   recordSubmission(
     orchestrationResult.submission.referenceId,
@@ -783,6 +925,47 @@ function slugify(value) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function hasText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+const COUNTRY_TO_ISO_CODE = new Map([
+  ["canada", "CA"],
+  ["germany", "DE"],
+  ["mexico", "MX"],
+  ["singapore", "SG"],
+  ["united kingdom", "GB"],
+  ["united states", "US"],
+]);
+
+function toIsoCountryCode(value) {
+  const normalized = String(value ?? "").trim();
+
+  if (/^[A-Za-z]{2}$/.test(normalized)) {
+    return normalized.toUpperCase();
+  }
+
+  return COUNTRY_TO_ISO_CODE.get(normalized.toLowerCase()) ?? normalized.toUpperCase();
+}
+
+function mapRiskScoreToRating(score) {
+  const normalizedScore = Number(score);
+
+  if (Number.isNaN(normalizedScore)) {
+    return "MEDIUM";
+  }
+
+  if (normalizedScore >= 70) {
+    return "HIGH";
+  }
+
+  if (normalizedScore >= 45) {
+    return "MEDIUM";
+  }
+
+  return "LOW";
 }
 
 function parseRevenue(value) {
@@ -1694,6 +1877,21 @@ const server = createServer(async (request, response) => {
       return;
     }
 
+    const fincenCddAssessmentRoute = matchFincenCddAssessmentRoute(url);
+    if (request.method === "GET" && fincenCddAssessmentRoute) {
+      const responseBody = buildFincenCddAssessment(
+        db,
+        fincenCddAssessmentRoute.entityId,
+      );
+      const result = json(
+        responseBody,
+        responseBody.error === "Entity not found." ? 404 : responseBody.error ? 400 : 200,
+      );
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
     const uboRoute = matchUboRoute(url);
     if (request.method === "GET" && uboRoute) {
       const responseBody = uboRoute.uboId
@@ -1848,6 +2046,26 @@ const server = createServer(async (request, response) => {
       const payload = JSON.parse(rawBody);
       const responseBody = createEntity(db, payload);
       const result = json(responseBody, responseBody.error ? 400 : 201);
+      response.writeHead(result.statusCode, result.headers);
+      response.end(result.body);
+      return;
+    }
+
+    if (
+      request.method === "POST" &&
+      matchesRoute(
+        url,
+        "/api/fincen-cdd/assessments",
+        "/api/v1/fincen-cdd/assessments",
+      )
+    ) {
+      const rawBody = await readRequestBody(request);
+      const payload = JSON.parse(rawBody);
+      const responseBody = buildFincenCddAssessmentFromPayload(db, payload);
+      const result = json(
+        responseBody,
+        responseBody.error === "Entity not found." ? 404 : responseBody.error ? 400 : 200,
+      );
       response.writeHead(result.statusCode, result.headers);
       response.end(result.body);
       return;

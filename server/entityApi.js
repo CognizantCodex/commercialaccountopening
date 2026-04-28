@@ -1,3 +1,5 @@
+import { normalizeNaicsCode, resolveNaicsCode } from "./naics.js";
+
 function hasText(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -46,6 +48,22 @@ function collectEntityValidationIssues(payload, { partial = false } = {}) {
       issues.push("jurisdiction is required.");
     } else if (jurisdiction.length !== 2) {
       issues.push("jurisdiction must be a 2-character ISO country code.");
+    }
+  }
+
+  const hasNaicsInput =
+    Object.hasOwn(payload, "naics_code") ||
+    Object.hasOwn(payload, "industry") ||
+    Object.hasOwn(payload, "primary_industry") ||
+    Object.hasOwn(payload, "primaryIndustry");
+
+  if (!partial || hasNaicsInput) {
+    const explicitNaics = normalizeNaicsCode(payload.naics_code);
+
+    if (explicitNaics === "") {
+      issues.push("naics_code must contain 2 to 6 digits.");
+    } else if (!resolveNaicsCode(payload)) {
+      issues.push("naics_code is required or must be derivable from a supported industry.");
     }
   }
 
@@ -115,7 +133,7 @@ export function createEntity(db, payload) {
     hasText(payload.lei_code) ? String(payload.lei_code).trim() : null,
     hasText(payload.incorporation_dt) ? String(payload.incorporation_dt).trim() : null,
     payload.is_listed ? 1 : 0,
-    hasText(payload.naics_code) ? String(payload.naics_code).trim() : null,
+    resolveNaicsCode(payload),
     hasText(payload.risk_rating) ? String(payload.risk_rating).trim().toUpperCase() : null,
     hasText(payload.status) ? String(payload.status).trim().toUpperCase() : "PENDING",
   );
@@ -200,7 +218,14 @@ export function updateEntity(db, entityId, payload) {
 
   if (Object.hasOwn(payload, "naics_code")) {
     updates.push("naics_code = ?");
-    values.push(hasText(payload.naics_code) ? String(payload.naics_code).trim() : null);
+    values.push(resolveNaicsCode(payload));
+  } else if (
+    Object.hasOwn(payload, "industry") ||
+    Object.hasOwn(payload, "primary_industry") ||
+    Object.hasOwn(payload, "primaryIndustry")
+  ) {
+    updates.push("naics_code = ?");
+    values.push(resolveNaicsCode(payload));
   }
 
   if (Object.hasOwn(payload, "risk_rating")) {

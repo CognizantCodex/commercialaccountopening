@@ -1,10 +1,22 @@
-const ID_TYPES = new Set(["PASSPORT", "NATIONAL_ID", "DRIVERS_LICENSE"]);
+const ID_TYPES = new Set([
+  "PASSPORT",
+  "NATIONAL_ID",
+  "DRIVERS_LICENSE",
+  "OTHER_GOVERNMENT_ID",
+]);
 const CONTROL_TYPES = new Set([
   "DIRECT_OWNERSHIP",
   "INDIRECT",
   "CONTROL_BY_OTHER_MEANS",
 ]);
 const SCREENING_STATUSES = new Set(["PENDING", "CLEAR", "FLAGGED", "ESCALATED"]);
+const CDD_VERIFICATION_STATUSES = new Set(["PENDING", "VERIFIED", "FAILED", "EXEMPT"]);
+const CDD_VERIFICATION_METHODS = new Set([
+  "DOCUMENTARY",
+  "NON_DOCUMENTARY",
+  "BOTH",
+  "RELIANCE",
+]);
 
 function hasText(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -59,8 +71,21 @@ function normalizeUboRow(row) {
     id_number: row.id_number,
     id_expiry_date: row.id_expiry_date,
     id_issuing_country: row.id_issuing_country,
+    residential_address_line1: row.residential_address_line1,
+    residential_address_line2: row.residential_address_line2,
+    residential_city: row.residential_city,
+    residential_state: row.residential_state,
+    residential_postal_code: row.residential_postal_code,
+    residential_country: row.residential_country,
     ownership_pct: Number(row.ownership_pct),
     control_type: row.control_type,
+    control_title: row.control_title,
+    is_control_person: Boolean(row.is_control_person),
+    cdd_verification_status: row.cdd_verification_status,
+    cdd_verification_method: row.cdd_verification_method,
+    cdd_verified_at: row.cdd_verified_at,
+    cdd_certification_date: row.cdd_certification_date,
+    cdd_certified_by: row.cdd_certified_by,
     is_pep: Boolean(row.is_pep),
     is_sanctioned: Boolean(row.is_sanctioned),
     is_adverse_media: Boolean(row.is_adverse_media),
@@ -76,7 +101,11 @@ function getUboRowById(db, uboId) {
     .prepare(
       `SELECT ubo_id, entity_id, first_name, last_name, date_of_birth, nationality,
               country_of_residence, id_type, id_number, id_expiry_date,
-              id_issuing_country, ownership_pct, control_type, is_pep,
+              id_issuing_country, residential_address_line1, residential_address_line2,
+              residential_city, residential_state, residential_postal_code,
+              residential_country, ownership_pct, control_type, control_title,
+              is_control_person, cdd_verification_status, cdd_verification_method,
+              cdd_verified_at, cdd_certification_date, cdd_certified_by, is_pep,
               is_sanctioned, is_adverse_media, screening_status, last_screened_at,
               created_at, updated_at
          FROM ubos
@@ -147,7 +176,9 @@ function collectUboValidationIssues(db, payload, { partial = false } = {}) {
     if (!idType) {
       issues.push("id_type is required.");
     } else if (!ID_TYPES.has(idType)) {
-      issues.push("id_type must be one of PASSPORT, NATIONAL_ID, or DRIVERS_LICENSE.");
+      issues.push(
+        "id_type must be one of PASSPORT, NATIONAL_ID, DRIVERS_LICENSE, or OTHER_GOVERNMENT_ID.",
+      );
     }
   }
 
@@ -173,6 +204,14 @@ function collectUboValidationIssues(db, payload, { partial = false } = {}) {
     }
   }
 
+  if (Object.hasOwn(payload, "residential_country") && payload.residential_country !== null) {
+    if (!hasText(payload.residential_country)) {
+      issues.push("residential_country must be null or a 2-character ISO country code.");
+    } else if (!isIsoCountryCode(payload.residential_country)) {
+      issues.push("residential_country must be a 2-character ISO country code.");
+    }
+  }
+
   if (!partial || Object.hasOwn(payload, "ownership_pct")) {
     const ownershipPct = Number(payload.ownership_pct);
     if (payload.ownership_pct === null || payload.ownership_pct === undefined || Number.isNaN(ownershipPct)) {
@@ -190,6 +229,54 @@ function collectUboValidationIssues(db, payload, { partial = false } = {}) {
       issues.push(
         "control_type must be one of DIRECT_OWNERSHIP, INDIRECT, or CONTROL_BY_OTHER_MEANS.",
       );
+    }
+  }
+
+  if (Object.hasOwn(payload, "is_control_person")) {
+    if (parseBooleanFlag(payload.is_control_person) === null) {
+      issues.push("is_control_person must be a boolean value.");
+    }
+  }
+
+  if (Object.hasOwn(payload, "cdd_verification_status")) {
+    const cddStatus = String(payload.cdd_verification_status ?? "").trim().toUpperCase();
+    if (!cddStatus) {
+      issues.push("cdd_verification_status must be a supported value.");
+    } else if (!CDD_VERIFICATION_STATUSES.has(cddStatus)) {
+      issues.push(
+        "cdd_verification_status must be one of PENDING, VERIFIED, FAILED, or EXEMPT.",
+      );
+    }
+  }
+
+  if (
+    Object.hasOwn(payload, "cdd_verification_method") &&
+    payload.cdd_verification_method !== null
+  ) {
+    const cddMethod = String(payload.cdd_verification_method ?? "").trim().toUpperCase();
+    if (!cddMethod) {
+      issues.push("cdd_verification_method must be null or a supported value.");
+    } else if (!CDD_VERIFICATION_METHODS.has(cddMethod)) {
+      issues.push(
+        "cdd_verification_method must be one of DOCUMENTARY, NON_DOCUMENTARY, BOTH, or RELIANCE.",
+      );
+    }
+  }
+
+  if (Object.hasOwn(payload, "cdd_verified_at") && payload.cdd_verified_at !== null) {
+    if (!hasText(payload.cdd_verified_at)) {
+      issues.push("cdd_verified_at must be null or a timestamp string.");
+    }
+  }
+
+  if (
+    Object.hasOwn(payload, "cdd_certification_date") &&
+    payload.cdd_certification_date !== null
+  ) {
+    if (!hasText(payload.cdd_certification_date)) {
+      issues.push("cdd_certification_date must be null or in YYYY-MM-DD format.");
+    } else if (!isIsoDate(payload.cdd_certification_date)) {
+      issues.push("cdd_certification_date must be in YYYY-MM-DD format.");
     }
   }
 
@@ -236,9 +323,14 @@ export function listUbos(db, entityId = "") {
         .prepare(
           `SELECT ubo_id, entity_id, first_name, last_name, date_of_birth, nationality,
                   country_of_residence, id_type, id_number, id_expiry_date,
-                  id_issuing_country, ownership_pct, control_type, is_pep,
-                  is_sanctioned, is_adverse_media, screening_status, last_screened_at,
-                  created_at, updated_at
+                  id_issuing_country, residential_address_line1,
+                  residential_address_line2, residential_city, residential_state,
+                  residential_postal_code, residential_country, ownership_pct,
+                  control_type, control_title, is_control_person,
+                  cdd_verification_status, cdd_verification_method,
+                  cdd_verified_at, cdd_certification_date, cdd_certified_by,
+                  is_pep, is_sanctioned, is_adverse_media, screening_status,
+                  last_screened_at, created_at, updated_at
              FROM ubos
             WHERE entity_id = ?
             ORDER BY created_at DESC, last_name ASC, first_name ASC`,
@@ -248,9 +340,14 @@ export function listUbos(db, entityId = "") {
         .prepare(
           `SELECT ubo_id, entity_id, first_name, last_name, date_of_birth, nationality,
                   country_of_residence, id_type, id_number, id_expiry_date,
-                  id_issuing_country, ownership_pct, control_type, is_pep,
-                  is_sanctioned, is_adverse_media, screening_status, last_screened_at,
-                  created_at, updated_at
+                  id_issuing_country, residential_address_line1,
+                  residential_address_line2, residential_city, residential_state,
+                  residential_postal_code, residential_country, ownership_pct,
+                  control_type, control_title, is_control_person,
+                  cdd_verification_status, cdd_verification_method,
+                  cdd_verified_at, cdd_certification_date, cdd_certified_by,
+                  is_pep, is_sanctioned, is_adverse_media, screening_status,
+                  last_screened_at, created_at, updated_at
              FROM ubos
             ORDER BY created_at DESC, last_name ASC, first_name ASC`,
         )
@@ -290,9 +387,13 @@ export function createUbo(db, payload) {
     `INSERT INTO ubos (
        entity_id, first_name, last_name, date_of_birth, nationality,
        country_of_residence, id_type, id_number, id_expiry_date,
-       id_issuing_country, ownership_pct, control_type, is_pep,
+       id_issuing_country, residential_address_line1, residential_address_line2,
+       residential_city, residential_state, residential_postal_code,
+       residential_country, ownership_pct, control_type, control_title,
+       is_control_person, cdd_verification_status, cdd_verification_method,
+       cdd_verified_at, cdd_certification_date, cdd_certified_by, is_pep,
        is_sanctioned, is_adverse_media, screening_status, last_screened_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     String(payload.entity_id).trim(),
     String(payload.first_name).trim(),
@@ -306,10 +407,30 @@ export function createUbo(db, payload) {
     payload.id_issuing_country === null || payload.id_issuing_country === undefined
       ? null
       : String(payload.id_issuing_country).trim().toUpperCase(),
+    normalizeNullableText(payload.residential_address_line1),
+    normalizeNullableText(payload.residential_address_line2),
+    normalizeNullableText(payload.residential_city),
+    normalizeNullableText(payload.residential_state),
+    normalizeNullableText(payload.residential_postal_code),
+    payload.residential_country === null || payload.residential_country === undefined
+      ? null
+      : String(payload.residential_country).trim().toUpperCase(),
     Number(payload.ownership_pct),
     payload.control_type === null || payload.control_type === undefined
       ? null
       : String(payload.control_type).trim().toUpperCase(),
+    normalizeNullableText(payload.control_title),
+    parseBooleanFlag(payload.is_control_person) ?? 0,
+    hasText(payload.cdd_verification_status)
+      ? String(payload.cdd_verification_status).trim().toUpperCase()
+      : "PENDING",
+    payload.cdd_verification_method === null ||
+    payload.cdd_verification_method === undefined
+      ? null
+      : String(payload.cdd_verification_method).trim().toUpperCase(),
+    normalizeNullableText(payload.cdd_verified_at),
+    normalizeNullableText(payload.cdd_certification_date),
+    normalizeNullableText(payload.cdd_certified_by),
     parseBooleanFlag(payload.is_pep) ?? 0,
     parseBooleanFlag(payload.is_sanctioned) ?? 0,
     parseBooleanFlag(payload.is_adverse_media) ?? 0,
@@ -323,7 +444,11 @@ export function createUbo(db, payload) {
     .prepare(
       `SELECT ubo_id, entity_id, first_name, last_name, date_of_birth, nationality,
               country_of_residence, id_type, id_number, id_expiry_date,
-              id_issuing_country, ownership_pct, control_type, is_pep,
+              id_issuing_country, residential_address_line1, residential_address_line2,
+              residential_city, residential_state, residential_postal_code,
+              residential_country, ownership_pct, control_type, control_title,
+              is_control_person, cdd_verification_status, cdd_verification_method,
+              cdd_verified_at, cdd_certification_date, cdd_certified_by, is_pep,
               is_sanctioned, is_adverse_media, screening_status, last_screened_at,
               created_at, updated_at
          FROM ubos
@@ -411,6 +536,40 @@ export function updateUbo(db, uboId, payload) {
     );
   }
 
+  if (Object.hasOwn(payload, "residential_address_line1")) {
+    updates.push("residential_address_line1 = ?");
+    values.push(normalizeNullableText(payload.residential_address_line1));
+  }
+
+  if (Object.hasOwn(payload, "residential_address_line2")) {
+    updates.push("residential_address_line2 = ?");
+    values.push(normalizeNullableText(payload.residential_address_line2));
+  }
+
+  if (Object.hasOwn(payload, "residential_city")) {
+    updates.push("residential_city = ?");
+    values.push(normalizeNullableText(payload.residential_city));
+  }
+
+  if (Object.hasOwn(payload, "residential_state")) {
+    updates.push("residential_state = ?");
+    values.push(normalizeNullableText(payload.residential_state));
+  }
+
+  if (Object.hasOwn(payload, "residential_postal_code")) {
+    updates.push("residential_postal_code = ?");
+    values.push(normalizeNullableText(payload.residential_postal_code));
+  }
+
+  if (Object.hasOwn(payload, "residential_country")) {
+    updates.push("residential_country = ?");
+    values.push(
+      payload.residential_country === null
+        ? null
+        : String(payload.residential_country).trim().toUpperCase(),
+    );
+  }
+
   if (Object.hasOwn(payload, "ownership_pct")) {
     updates.push("ownership_pct = ?");
     values.push(Number(payload.ownership_pct));
@@ -421,6 +580,45 @@ export function updateUbo(db, uboId, payload) {
     values.push(
       payload.control_type === null ? null : String(payload.control_type).trim().toUpperCase(),
     );
+  }
+
+  if (Object.hasOwn(payload, "control_title")) {
+    updates.push("control_title = ?");
+    values.push(normalizeNullableText(payload.control_title));
+  }
+
+  if (Object.hasOwn(payload, "is_control_person")) {
+    updates.push("is_control_person = ?");
+    values.push(parseBooleanFlag(payload.is_control_person));
+  }
+
+  if (Object.hasOwn(payload, "cdd_verification_status")) {
+    updates.push("cdd_verification_status = ?");
+    values.push(String(payload.cdd_verification_status).trim().toUpperCase());
+  }
+
+  if (Object.hasOwn(payload, "cdd_verification_method")) {
+    updates.push("cdd_verification_method = ?");
+    values.push(
+      payload.cdd_verification_method === null
+        ? null
+        : String(payload.cdd_verification_method).trim().toUpperCase(),
+    );
+  }
+
+  if (Object.hasOwn(payload, "cdd_verified_at")) {
+    updates.push("cdd_verified_at = ?");
+    values.push(normalizeNullableText(payload.cdd_verified_at));
+  }
+
+  if (Object.hasOwn(payload, "cdd_certification_date")) {
+    updates.push("cdd_certification_date = ?");
+    values.push(normalizeNullableText(payload.cdd_certification_date));
+  }
+
+  if (Object.hasOwn(payload, "cdd_certified_by")) {
+    updates.push("cdd_certified_by = ?");
+    values.push(normalizeNullableText(payload.cdd_certified_by));
   }
 
   if (Object.hasOwn(payload, "is_pep")) {
